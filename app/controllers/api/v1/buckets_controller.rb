@@ -1,6 +1,6 @@
 class Api::V1::BucketsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_bucket, only: [:show, :update, :destroy, :page, :randomize, :images, :single_image]
+  before_action :set_bucket, only: [:show, :update, :destroy, :page, :randomize, :images, :single_image, :upload_image]
   before_action :set_bucket_for_image_actions, only: [:update_image, :delete_image]
   before_action :set_bucket_image, only: [:update_image, :delete_image]
 
@@ -96,6 +96,72 @@ class Api::V1::BucketsController < ApplicationController
     render json: {
       bucket_image: bucket_image_json(@bucket_image)
     }
+  end
+
+  # POST /api/v1/buckets/:id/images/upload
+  # Uploads an image to a bucket
+  # Creates both an Image record and a BucketImage record
+  def upload_image
+    if params[:file].blank?
+      return render json: { error: 'No file provided' }, status: :bad_request
+    end
+
+    uploaded_file = params[:file]
+    
+    # For now, we'll store files locally. Later we'll integrate Digital Ocean Spaces
+    # Generate a unique filename to prevent collisions
+    file_extension = File.extname(uploaded_file.original_filename)
+    unique_filename = "#{SecureRandom.uuid}#{file_extension}"
+    
+    # Create directory if it doesn't exist
+    upload_dir = Rails.root.join('public', 'uploads', Rails.env.to_s)
+    FileUtils.mkdir_p(upload_dir) unless Dir.exist?(upload_dir)
+    
+    # Save the file
+    file_path = upload_dir.join(unique_filename)
+    File.open(file_path, 'wb') do |file|
+      file.write(uploaded_file.read)
+    end
+    
+    # Store relative path for database
+    relative_path = "uploads/#{Rails.env}/#{unique_filename}"
+    
+    # Extract friendly name from original filename (without extension)
+    friendly_name = File.basename(uploaded_file.original_filename, file_extension)
+    
+    # Create Image record
+    image = Image.new(
+      file_path: relative_path,
+      friendly_name: friendly_name
+    )
+    
+    if image.save
+      # Create BucketImage record linking the image to this bucket
+      bucket_image = @bucket.bucket_images.build(
+        image_id: image.id,
+        friendly_name: friendly_name
+      )
+      
+      if bucket_image.save
+        render json: {
+          bucket_image: bucket_image_json(bucket_image),
+          message: 'Image uploaded successfully'
+        }, status: :created
+      else
+        # If bucket_image fails to save, clean up the image
+        image.destroy
+        File.delete(file_path) if File.exist?(file_path)
+        render json: {
+          errors: bucket_image.errors.full_messages
+        }, status: :unprocessable_entity
+      end
+    else
+      # If image fails to save, clean up the file
+      File.delete(file_path) if File.exist?(file_path)
+      render json: {
+        errors: image.errors.full_messages
+      }, status: :unprocessable_entity
+    end
   end
 
   # PATCH /api/v1/buckets/:id/images/:image_id

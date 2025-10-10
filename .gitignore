@@ -31,3 +31,7 @@
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+
+# Ignore uploaded files
+/public/uploads/*
+!/public/uploads/.keep

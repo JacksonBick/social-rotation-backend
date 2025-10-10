@@ -32,6 +32,7 @@ Rails.application.routes.draw do
         member do
           get 'page/:page_num', to: 'buckets#page'
           get 'images', to: 'buckets#images'
+          post 'images/upload', to: 'buckets#upload_image'
           get 'images/:image_id', to: 'buckets#single_image'
           patch 'images/:image_id', to: 'buckets#update_image'
           delete 'images/:image_id', to: 'buckets#delete_image'
