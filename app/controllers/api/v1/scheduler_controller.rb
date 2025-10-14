@@ -41,15 +41,59 @@ class Api::V1::SchedulerController < ApplicationController
   end
 
   # POST /api/v1/scheduler/post_now/:id
+  # Immediately posts the scheduled content to social media
   def post_now
-    # This would trigger the actual posting process
-    # For now, we'll just mark it as processed
-    @bucket_schedule.update!(times_sent: @bucket_schedule.times_sent + 1)
+    # Get the next image to post
+    bucket_image = @bucket_schedule.get_next_bucket_image_due
     
-    render json: {
-      message: 'Post sent successfully',
-      times_sent: @bucket_schedule.times_sent
-    }
+    unless bucket_image
+      return render json: { error: 'No images available in bucket' }, status: :unprocessable_entity
+    end
+    
+    # Get description (use bucket_image description if available, otherwise schedule description)
+    description = bucket_image.description.presence || @bucket_schedule.description.presence || ''
+    twitter_description = bucket_image.twitter_description.presence || @bucket_schedule.twitter_description.presence || description
+    
+    begin
+      # Use the SocialMediaPosterService to post to all selected platforms
+      poster = SocialMediaPosterService.new(
+        current_user,
+        bucket_image,
+        @bucket_schedule.post_to,
+        description,
+        twitter_description
+      )
+      
+      results = poster.post_to_all
+      
+      # Create send history record
+      history = @bucket_schedule.bucket_send_histories.create!(
+        bucket_id: @bucket_schedule.bucket_id,
+        bucket_image_id: bucket_image.id,
+        description: description,
+        twitter_text: twitter_description,
+        post_to: @bucket_schedule.post_to,
+        sent_at: Time.current
+      )
+      
+      # Update schedule
+      @bucket_schedule.increment!(:times_sent)
+      
+      render json: {
+        message: 'Post sent successfully',
+        results: results,
+        times_sent: @bucket_schedule.times_sent,
+        history_id: history.id
+      }
+    rescue => e
+      Rails.logger.error "Error posting to social media: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      
+      render json: {
+        error: 'Failed to post to social media',
+        details: e.message
+      }, status: :unprocessable_entity
+    end
   end
 
   # POST /api/v1/scheduler/skip_image/:id
