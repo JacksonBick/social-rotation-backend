@@ -166,15 +166,50 @@ class Api::V1::BucketsController < ApplicationController
 
   # PATCH /api/v1/buckets/:id/images/:image_id
   def update_image
-    if @bucket_image.update(bucket_image_params)
+    # Check if a new file is being uploaded (for image editing)
+    if params[:file].present?
+      uploaded_file = params[:file]
+      
+      # Generate a unique filename
+      file_extension = File.extname(uploaded_file.original_filename)
+      unique_filename = "#{SecureRandom.uuid}#{file_extension}"
+      
+      # Create directory if it doesn't exist
+      upload_dir = Rails.root.join('public', 'uploads', Rails.env.to_s)
+      FileUtils.mkdir_p(upload_dir) unless Dir.exist?(upload_dir)
+      
+      # Save the new file
+      file_path = upload_dir.join(unique_filename)
+      File.open(file_path, 'wb') do |file|
+        file.write(uploaded_file.read)
+      end
+      
+      # Delete old file if it exists
+      old_file_path = Rails.root.join('public', @bucket_image.image.file_path)
+      File.delete(old_file_path) if File.exist?(old_file_path)
+      
+      # Update the image record with new file path
+      relative_path = "uploads/#{Rails.env}/#{unique_filename}"
+      @bucket_image.image.update(file_path: relative_path)
+      
       render json: {
         bucket_image: bucket_image_json(@bucket_image),
         message: 'Image updated successfully'
       }
+    elsif bucket_image_params.present?
+      # Update metadata only
+      if @bucket_image.update(bucket_image_params)
+        render json: {
+          bucket_image: bucket_image_json(@bucket_image),
+          message: 'Image updated successfully'
+        }
+      else
+        render json: {
+          errors: @bucket_image.errors.full_messages
+        }, status: :unprocessable_entity
+      end
     else
-      render json: {
-        errors: @bucket_image.errors.full_messages
-      }, status: :unprocessable_entity
+      render json: { error: 'No data provided' }, status: :bad_request
     end
   end
 
