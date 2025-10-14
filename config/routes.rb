@@ -8,11 +8,21 @@ Rails.application.routes.draw do
   # API Routes
   namespace :api do
     namespace :v1 do
-      # Authentication routes (you'll need to implement these)
+      # Authentication routes
       post 'auth/login', to: 'auth#login'
       post 'auth/register', to: 'auth#register'
       post 'auth/logout', to: 'auth#logout'
       post 'auth/refresh', to: 'auth#refresh'
+      
+      # OAuth routes
+      get 'oauth/facebook/login', to: 'oauth#facebook_login'
+      get 'oauth/facebook/callback', to: 'oauth#facebook_callback'
+      get 'oauth/twitter/login', to: 'oauth#twitter_login'
+      get 'oauth/twitter/callback', to: 'oauth#twitter_callback'
+      get 'oauth/linkedin/login', to: 'oauth#linkedin_login'
+      get 'oauth/linkedin/callback', to: 'oauth#linkedin_callback'
+      get 'oauth/google/login', to: 'oauth#google_login'
+      get 'oauth/google/callback', to: 'oauth#google_callback'
 
       # User info routes
       get 'user_info', to: 'user_info#show'

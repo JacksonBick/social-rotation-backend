@@ -56,3 +56,5 @@ end
 gem "jwt", "~> 3.1"
 
 gem "rack-cors", "~> 3.0"
+
+gem "httparty", "~> 0.21"
