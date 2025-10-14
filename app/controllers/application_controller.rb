@@ -1,11 +1,12 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
+  include ActionController::RequestForgeryProtection
 
   # Skip CSRF for API (use token authentication instead)
-  # protect_from_forgery with: :null_session
+  protect_from_forgery with: :null_session
 
   # Handle authentication
-  before_action :authenticate_user!
+  before_action :authenticate_user!, unless: :auth_or_oauth_controller?
 
   # Handle exceptions
   rescue_from ActiveRecord::RecordNotFound, with: :record_not_found
@@ -65,5 +66,11 @@ class ApplicationController < ActionController::API
       error: 'Missing required parameter', 
       parameter: exception.param 
     }, status: :bad_request
+  end
+
+  # Check if the current controller is AuthController or OauthController
+  def auth_or_oauth_controller?
+    controller_path = params[:controller]
+    controller_path.start_with?('api/v1/auth') || controller_path.start_with?('api/v1/oauth')
   end
 end
