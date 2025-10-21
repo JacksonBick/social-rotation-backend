@@ -97,6 +97,29 @@ class Api::V1::UserInfoController < ApplicationController
     render json: { message: 'Google My Business disconnected successfully' }
   end
 
+  # POST /api/v1/user_info/disconnect_tiktok
+  def disconnect_tiktok
+    current_user.update!(
+      tiktok_access_token: nil,
+      tiktok_refresh_token: nil,
+      tiktok_user_id: nil,
+      tiktok_username: nil
+    )
+    
+    render json: { message: 'TikTok disconnected successfully' }
+  end
+
+  # POST /api/v1/user_info/disconnect_youtube
+  def disconnect_youtube
+    current_user.update!(
+      youtube_access_token: nil,
+      youtube_refresh_token: nil,
+      youtube_channel_id: nil
+    )
+    
+    render json: { message: 'YouTube disconnected successfully' }
+  end
+
   # POST /api/v1/user_info/toggle_instagram
   def toggle_instagram
     current_user.update!(post_to_instagram: params[:post_to_instagram] == 'true')
@@ -168,7 +191,9 @@ class Api::V1::UserInfoController < ApplicationController
       twitter_connected: user.twitter_oauth_token.present?,
       linkedin_connected: user.linkedin_access_token.present?,
       google_connected: user.google_refresh_token.present?,
-      instagram_connected: user.instagram_business_id.present?
+      instagram_connected: user.instagram_business_id.present?,
+      tiktok_connected: user.tiktok_access_token.present?,
+      youtube_connected: user.youtube_access_token.present?
     }
   end
 end

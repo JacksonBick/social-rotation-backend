@@ -2,6 +2,12 @@ source "https://rubygems.org"
 
 ruby "3.2.2"
 
+# Load environment variables from .env file
+gem "dotenv-rails", "~> 2.8"
+
+# OAuth 1.0a for Twitter
+gem "oauth", "~> 1.1"
+
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 7.1.5", ">= 7.1.5.1"
 

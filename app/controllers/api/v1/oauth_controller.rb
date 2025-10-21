@@ -1,5 +1,5 @@
 class Api::V1::OauthController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:facebook_callback, :twitter_callback, :linkedin_callback, :google_callback]
+  skip_before_action :authenticate_user!, only: [:facebook_callback, :twitter_callback, :linkedin_callback, :google_callback, :tiktok_callback, :youtube_callback]
   
   # GET /api/v1/oauth/facebook/login
   # Initiates Facebook OAuth flow
@@ -80,20 +80,94 @@ class Api::V1::OauthController < ApplicationController
   end
   
   # GET /api/v1/oauth/twitter/login
-  # Initiates Twitter OAuth flow
+  # Initiates Twitter OAuth 1.0a flow
   def twitter_login
-    # Twitter uses OAuth 1.0a - more complex
-    # For now, return placeholder
-    render json: { 
-      message: 'Twitter OAuth requires OAuth 1.0a implementation',
-      note: 'This will be implemented with the twitter-api gem'
-    }
+    consumer_key = ENV['TWITTER_API_KEY'] || '5PIs17xez9qVUKft2qYOec6uR'
+    consumer_secret = ENV['TWITTER_API_SECRET_KEY'] || 'wa4aaGQBK3AU75ji1eUBmNfCLO0IhotZD36faf3ZuX91WOnrqz'
+    callback_url = ENV['TWITTER_CALLBACK'] || 'https://my.socialrotation.app/twitter/callback'
+    
+    # Create OAuth consumer
+    consumer = ::OAuth::Consumer.new(
+      consumer_key,
+      consumer_secret,
+      site: 'https://api.twitter.com',
+      request_token_path: '/oauth/request_token',
+      authorize_path: '/oauth/authorize',
+      access_token_path: '/oauth/access_token'
+    )
+    
+    begin
+      # Get request token
+      request_token = consumer.get_request_token(oauth_callback: callback_url)
+      
+      # Store request token in session
+      session[:twitter_request_token] = request_token.token
+      session[:twitter_request_secret] = request_token.secret
+      session[:user_id] = current_user.id
+      
+      # Return authorize URL
+      oauth_url = request_token.authorize_url
+      render json: { oauth_url: oauth_url }
+    rescue => e
+      Rails.logger.error "Twitter OAuth error: #{e.message}"
+      render json: { error: 'Twitter authentication failed', details: e.message }, status: :internal_server_error
+    end
   end
   
   # GET /api/v1/oauth/twitter/callback
   def twitter_callback
-    # Twitter OAuth 1.0a callback handler
-    render json: { message: 'Twitter callback' }
+    consumer_key = ENV['TWITTER_API_KEY'] || '5PIs17xez9qVUKft2qYOec6uR'
+    consumer_secret = ENV['TWITTER_API_SECRET_KEY'] || 'wa4aaGQBK3AU75ji1eUBmNfCLO0IhotZD36faf3ZuX91WOnrqz'
+    
+    oauth_token = params[:oauth_token]
+    oauth_verifier = params[:oauth_verifier]
+    
+    # Get user from session
+    user_id = session[:user_id]
+    user = User.find_by(id: user_id)
+    
+    unless user
+      return redirect_to "https://my.socialrotation.app/profile?error=user_not_found"
+    end
+    
+    # Create OAuth consumer
+    consumer = ::OAuth::Consumer.new(
+      consumer_key,
+      consumer_secret,
+      site: 'https://api.twitter.com',
+      request_token_path: '/oauth/request_token',
+      authorize_path: '/oauth/authorize',
+      access_token_path: '/oauth/access_token'
+    )
+    
+    begin
+      # Recreate request token from session
+      request_token = ::OAuth::RequestToken.new(
+        consumer,
+        session[:twitter_request_token],
+        session[:twitter_request_secret]
+      )
+      
+      # Exchange for access token
+      access_token = request_token.get_access_token(oauth_verifier: oauth_verifier)
+      
+      # Save to user
+      user.update!(
+        twitter_oauth_token: access_token.token,
+        twitter_oauth_token_secret: access_token.secret,
+        twitter_user_id: access_token.params['user_id'],
+        twitter_screen_name: access_token.params['screen_name']
+      )
+      
+      # Clear session
+      session.delete(:twitter_request_token)
+      session.delete(:twitter_request_secret)
+      
+      redirect_to "https://my.socialrotation.app/profile?success=twitter_connected"
+    rescue => e
+      Rails.logger.error "Twitter OAuth callback error: #{e.message}"
+      redirect_to "https://my.socialrotation.app/profile?error=twitter_auth_failed"
+    end
   end
   
   # GET /api/v1/oauth/linkedin/login
@@ -103,8 +177,9 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_id = ENV['LINKEDIN_CLIENT_ID']
-    redirect_uri = "#{request.base_url}/api/v1/oauth/linkedin/callback"
+    client_id = ENV['LINKEDIN_CLIENT_ID'] || '86e3q5wfvamuqa'
+    # Use production callback URL for LinkedIn OAuth
+    redirect_uri = ENV['LINKEDIN_CALLBACK'] || 'https://my.socialrotation.app/linkedin/callback'
     
     oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" \
                 "response_type=code" \
@@ -122,20 +197,20 @@ class Api::V1::OauthController < ApplicationController
     state = params[:state]
     
     if state != session[:oauth_state]
-      return redirect_to "#{ENV['FRONTEND_URL']}/profile?error=invalid_state"
+      return redirect_to "https://my.socialrotation.app/profile?error=invalid_state"
     end
     
     user_id = session[:user_id]
     user = User.find_by(id: user_id)
     
     unless user
-      return redirect_to "#{ENV['FRONTEND_URL']}/profile?error=user_not_found"
+      return redirect_to "https://my.socialrotation.app/profile?error=user_not_found"
     end
     
     # Exchange code for access token
-    client_id = ENV['LINKEDIN_CLIENT_ID']
-    client_secret = ENV['LINKEDIN_CLIENT_SECRET']
-    redirect_uri = "#{request.base_url}/api/v1/oauth/linkedin/callback"
+    client_id = ENV['LINKEDIN_CLIENT_ID'] || '86e3q5wfvamuqa'
+    client_secret = ENV['LINKEDIN_CLIENT_SECRET'] || 'BP8wbuFAJGCVIYDq'
+    redirect_uri = ENV['LINKEDIN_CALLBACK'] || 'https://my.socialrotation.app/linkedin/callback'
     
     token_url = "https://www.linkedin.com/oauth/v2/accessToken"
     
@@ -158,13 +233,13 @@ class Api::V1::OauthController < ApplicationController
           linkedin_access_token_time: Time.current
         )
         
-        redirect_to "#{ENV['FRONTEND_URL']}/profile?success=linkedin_connected"
+        redirect_to "https://my.socialrotation.app/profile?success=linkedin_connected"
       else
-        redirect_to "#{ENV['FRONTEND_URL']}/profile?error=linkedin_auth_failed"
+        redirect_to "https://my.socialrotation.app/profile?error=linkedin_auth_failed"
       end
     rescue => e
       Rails.logger.error "LinkedIn OAuth error: #{e.message}"
-      redirect_to "#{ENV['FRONTEND_URL']}/profile?error=linkedin_auth_failed"
+      redirect_to "https://my.socialrotation.app/profile?error=linkedin_auth_failed"
     end
   end
   
@@ -175,8 +250,9 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_id = ENV['GOOGLE_CLIENT_ID']
-    redirect_uri = "#{request.base_url}/api/v1/oauth/google/callback"
+    client_id = ENV['GOOGLE_CLIENT_ID'] || '1050295806479-d29blhmka53vtmj3dgshp59arp8ic8al.apps.googleusercontent.com'
+    # Use production callback URL for Google OAuth
+    redirect_uri = ENV['GOOGLE_CALLBACK'] || 'https://my.socialrotation.app/google/callback'
     
     oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?" \
                 "client_id=#{client_id}" \
@@ -195,20 +271,20 @@ class Api::V1::OauthController < ApplicationController
     state = params[:state]
     
     if state != session[:oauth_state]
-      return redirect_to "#{ENV['FRONTEND_URL']}/profile?error=invalid_state"
+      return redirect_to "https://my.socialrotation.app/profile?error=invalid_state"
     end
     
     user_id = session[:user_id]
     user = User.find_by(id: user_id)
     
     unless user
-      return redirect_to "#{ENV['FRONTEND_URL']}/profile?error=user_not_found"
+      return redirect_to "https://my.socialrotation.app/profile?error=user_not_found"
     end
     
     # Exchange code for access token
-    client_id = ENV['GOOGLE_CLIENT_ID']
-    client_secret = ENV['GOOGLE_CLIENT_SECRET']
-    redirect_uri = "#{request.base_url}/api/v1/oauth/google/callback"
+    client_id = ENV['GOOGLE_CLIENT_ID'] || '1050295806479-d29blhmka53vtmj3dgshp59arp8ic8al.apps.googleusercontent.com'
+    client_secret = ENV['GOOGLE_CLIENT_SECRET'] || 'wyZs7M4qFFvd1C1TVQGqvY27'
+    redirect_uri = ENV['GOOGLE_CALLBACK'] || 'https://my.socialrotation.app/google/callback'
     
     token_url = "https://oauth2.googleapis.com/token"
     
@@ -227,13 +303,161 @@ class Api::V1::OauthController < ApplicationController
       
       if data['refresh_token']
         user.update!(google_refresh_token: data['refresh_token'])
-        redirect_to "#{ENV['FRONTEND_URL']}/profile?success=google_connected"
+        redirect_to "https://my.socialrotation.app/profile?success=google_connected"
       else
-        redirect_to "#{ENV['FRONTEND_URL']}/profile?error=google_auth_failed"
+        redirect_to "https://my.socialrotation.app/profile?error=google_auth_failed"
       end
     rescue => e
       Rails.logger.error "Google OAuth error: #{e.message}"
-      redirect_to "#{ENV['FRONTEND_URL']}/profile?error=google_auth_failed"
+      redirect_to "https://my.socialrotation.app/profile?error=google_auth_failed"
+    end
+  end
+  
+  # GET /api/v1/oauth/tiktok/login
+  # Initiates TikTok OAuth flow
+  def tiktok_login
+    state = SecureRandom.hex(16)
+    session[:oauth_state] = state
+    session[:user_id] = current_user.id
+    
+    client_key = ENV['TIKTOK_CLIENT_KEY'] || 'YOUR_TIKTOK_CLIENT_KEY'
+    redirect_uri = ENV['TIKTOK_CALLBACK'] || 'https://my.socialrotation.app/tiktok/callback'
+    
+    oauth_url = "https://www.tiktok.com/v2/auth/authorize?" \
+                "client_key=#{client_key}" \
+                "&scope=user.info.basic,video.publish" \
+                "&response_type=code" \
+                "&redirect_uri=#{CGI.escape(redirect_uri)}" \
+                "&state=#{state}"
+    
+    render json: { oauth_url: oauth_url }
+  end
+  
+  # GET /api/v1/oauth/tiktok/callback
+  def tiktok_callback
+    code = params[:code]
+    state = params[:state]
+    
+    if state != session[:oauth_state]
+      return redirect_to "https://my.socialrotation.app/profile?error=invalid_state"
+    end
+    
+    user_id = session[:user_id]
+    user = User.find_by(id: user_id)
+    
+    unless user
+      return redirect_to "https://my.socialrotation.app/profile?error=user_not_found"
+    end
+    
+    # Exchange code for access token
+    client_key = ENV['TIKTOK_CLIENT_KEY'] || 'YOUR_TIKTOK_CLIENT_KEY'
+    client_secret = ENV['TIKTOK_CLIENT_SECRET'] || 'YOUR_TIKTOK_CLIENT_SECRET'
+    redirect_uri = ENV['TIKTOK_CALLBACK'] || 'https://my.socialrotation.app/tiktok/callback'
+    
+    token_url = "https://open.tiktokapis.com/v2/oauth/token/"
+    
+    begin
+      response = HTTParty.post(token_url, {
+        headers: {
+          'Content-Type' => 'application/x-www-form-urlencoded'
+        },
+        body: {
+          client_key: client_key,
+          client_secret: client_secret,
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: redirect_uri
+        }
+      })
+      
+      data = JSON.parse(response.body)
+      
+      if data['access_token']
+        user.update!(
+          tiktok_access_token: data['access_token'],
+          tiktok_refresh_token: data['refresh_token']
+        )
+        
+        redirect_to "https://my.socialrotation.app/profile?success=tiktok_connected"
+      else
+        redirect_to "https://my.socialrotation.app/profile?error=tiktok_auth_failed"
+      end
+    rescue => e
+      Rails.logger.error "TikTok OAuth error: #{e.message}"
+      redirect_to "https://my.socialrotation.app/profile?error=tiktok_auth_failed"
+    end
+  end
+  
+  # GET /api/v1/oauth/youtube/login
+  # Initiates YouTube OAuth flow
+  def youtube_login
+    state = SecureRandom.hex(16)
+    session[:oauth_state] = state
+    session[:user_id] = current_user.id
+    
+    client_id = ENV['YOUTUBE_CLIENT_ID'] || 'YOUR_YOUTUBE_CLIENT_ID'
+    redirect_uri = ENV['YOUTUBE_CALLBACK'] || 'https://my.socialrotation.app/youtube/callback'
+    
+    oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?" \
+                "client_id=#{client_id}" \
+                "&redirect_uri=#{CGI.escape(redirect_uri)}" \
+                "&response_type=code" \
+                "&scope=#{CGI.escape('https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube')}" \
+                "&access_type=offline" \
+                "&state=#{state}"
+    
+    render json: { oauth_url: oauth_url }
+  end
+  
+  # GET /api/v1/oauth/youtube/callback
+  def youtube_callback
+    code = params[:code]
+    state = params[:state]
+    
+    if state != session[:oauth_state]
+      return redirect_to "https://my.socialrotation.app/profile?error=invalid_state"
+    end
+    
+    user_id = session[:user_id]
+    user = User.find_by(id: user_id)
+    
+    unless user
+      return redirect_to "https://my.socialrotation.app/profile?error=user_not_found"
+    end
+    
+    # Exchange code for access token
+    client_id = ENV['YOUTUBE_CLIENT_ID'] || 'YOUR_YOUTUBE_CLIENT_ID'
+    client_secret = ENV['YOUTUBE_CLIENT_SECRET'] || 'YOUR_YOUTUBE_CLIENT_SECRET'
+    redirect_uri = ENV['YOUTUBE_CALLBACK'] || 'https://my.socialrotation.app/youtube/callback'
+    
+    token_url = "https://oauth2.googleapis.com/token"
+    
+    begin
+      response = HTTParty.post(token_url, {
+        body: {
+          code: code,
+          client_id: client_id,
+          client_secret: client_secret,
+          redirect_uri: redirect_uri,
+          grant_type: 'authorization_code'
+        }
+      })
+      
+      data = JSON.parse(response.body)
+      
+      if data['refresh_token']
+        user.update!(
+          youtube_refresh_token: data['refresh_token'],
+          youtube_access_token: data['access_token']
+        )
+        
+        redirect_to "https://my.socialrotation.app/profile?success=youtube_connected"
+      else
+        redirect_to "https://my.socialrotation.app/profile?error=youtube_auth_failed"
+      end
+    rescue => e
+      Rails.logger.error "YouTube OAuth error: #{e.message}"
+      redirect_to "https://my.socialrotation.app/profile?error=youtube_auth_failed"
     end
   end
 end

@@ -1,9 +1,8 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
-  include ActionController::RequestForgeryProtection
 
   # Skip CSRF for API (use token authentication instead)
-  protect_from_forgery with: :null_session
+  # ActionController::API doesn't have CSRF protection by default
 
   # Handle authentication
   before_action :authenticate_user!, unless: :auth_or_oauth_controller?
@@ -68,9 +67,13 @@ class ApplicationController < ActionController::API
     }, status: :bad_request
   end
 
-  # Check if the current controller is AuthController or OauthController
+  # Check if the current controller is AuthController or OauthController callback actions
   def auth_or_oauth_controller?
     controller_path = params[:controller]
-    controller_path.start_with?('api/v1/auth') || controller_path.start_with?('api/v1/oauth')
+    action_name = params[:action]
+    
+    # Skip authentication for auth controller and OAuth callback actions only
+    controller_path.start_with?('api/v1/auth') || 
+    (controller_path.start_with?('api/v1/oauth') && action_name.end_with?('_callback'))
   end
 end

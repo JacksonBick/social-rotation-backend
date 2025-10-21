@@ -23,6 +23,10 @@ Rails.application.routes.draw do
       get 'oauth/linkedin/callback', to: 'oauth#linkedin_callback'
       get 'oauth/google/login', to: 'oauth#google_login'
       get 'oauth/google/callback', to: 'oauth#google_callback'
+      get 'oauth/tiktok/login', to: 'oauth#tiktok_login'
+      get 'oauth/tiktok/callback', to: 'oauth#tiktok_callback'
+      get 'oauth/youtube/login', to: 'oauth#youtube_login'
+      get 'oauth/youtube/callback', to: 'oauth#youtube_callback'
 
       # User info routes
       get 'user_info', to: 'user_info#show'
@@ -33,6 +37,8 @@ Rails.application.routes.draw do
       post 'user_info/disconnect_twitter', to: 'user_info#disconnect_twitter'
       post 'user_info/disconnect_linkedin', to: 'user_info#disconnect_linkedin'
       post 'user_info/disconnect_google', to: 'user_info#disconnect_google'
+      post 'user_info/disconnect_tiktok', to: 'user_info#disconnect_tiktok'
+      post 'user_info/disconnect_youtube', to: 'user_info#disconnect_youtube'
       post 'user_info/toggle_instagram', to: 'user_info#toggle_instagram'
       get 'user_info/watermark_preview', to: 'user_info#watermark_preview'
       get 'user_info/standard_preview', to: 'user_info#standard_preview'
