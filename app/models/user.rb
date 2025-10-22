@@ -6,6 +6,10 @@ class User < ApplicationRecord
   has_secure_password
   
   # ASSOCIATIONS
+  # User belongs to an Account (for reseller/sub-account system)
+  # account_id = 0 means super admin, > 0 means belongs to a reseller account
+  belongs_to :account, optional: true
+  
   # User owns multiple buckets (content collections) - destroy buckets when user is deleted
   has_many :buckets, dependent: :destroy
   # User has access to bucket_schedules through their buckets
@@ -16,6 +20,8 @@ class User < ApplicationRecord
   has_many :user_market_items, dependent: :destroy
   # User can access purchased market items through user_market_items
   has_many :market_items, through: :user_market_items
+  # User can create RSS feeds (only account admins)
+  has_many :rss_feeds, dependent: :destroy
   
   # VALIDATIONS
   # Email must exist, be unique, and match valid email format
@@ -72,6 +78,59 @@ class User < ApplicationRecord
   def get_absolute_watermark_logo_path
     watermark_logo ? Rails.root.join("public/storage/#{rails_env}/#{id}/watermarks/#{watermark_logo}").to_s : ''
   end
+  
+  # ACCOUNT/RESELLER METHODS
+  
+  # Check if user is a super admin (account_id = 0)
+  # Super admins have full access to everything including marketplace creation
+  def super_admin?
+    account_id == 0
+  end
+  
+  # Check if user is an account admin (can manage sub-accounts)
+  def account_admin?
+    is_account_admin
+  end
+  
+  # Check if user is a reseller (account admin + reseller account)
+  # Resellers can create sub-accounts and private marketplaces
+  def reseller?
+    account_admin? && account&.reseller? || false
+  end
+  
+  # Check if user can access marketplace
+  def can_access_marketplace?
+    super_admin? || account&.account_feature&.allow_marketplace
+  end
+  
+  # Check if user can create marketplace items
+  def can_create_marketplace_item?
+    super_admin? || reseller?
+  end
+  
+  # Check if user can create sub-accounts
+  def can_create_sub_account?
+    reseller?
+  end
+  
+  # Check if user can manage RSS feeds
+  def can_manage_rss_feeds?
+    super_admin? || reseller?
+  end
+  
+  # Check if user can access RSS feeds
+  def can_access_rss_feeds?
+    super_admin? || account&.account_feature&.allow_rss
+  end
+  
+  # Get all users in the same account (for account admins)
+  def account_users
+    return User.none unless account_id && account_id > 0
+    User.where(account_id: account_id)
+  end
+  
+  # Scope for active users
+  scope :active, -> { where(status: 1) }
 
   private
 

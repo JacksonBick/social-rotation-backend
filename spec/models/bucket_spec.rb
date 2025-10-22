@@ -52,8 +52,10 @@ RSpec.describe Bucket, type: :model do
     describe '#get_next_rotation_image' do
       let(:image1) { create(:image, friendly_name: 'A') }
       let(:image2) { create(:image, friendly_name: 'B') }
+      let(:image3) { create(:image, friendly_name: 'C') }
       let!(:bucket_image1) { create(:bucket_image, bucket: bucket, image: image1, friendly_name: 'A') }
       let!(:bucket_image2) { create(:bucket_image, bucket: bucket, image: image2, friendly_name: 'B') }
+      let!(:bucket_image3) { create(:bucket_image, bucket: bucket, image: image3, friendly_name: 'C') }
 
       it 'returns nil when no rotation schedules exist' do
         expect(bucket.get_next_rotation_image).to be_nil
@@ -62,6 +64,70 @@ RSpec.describe Bucket, type: :model do
       it 'returns the first image when no previous sends' do
         create(:bucket_schedule, bucket: bucket, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION)
         expect(bucket.get_next_rotation_image).to eq(bucket_image1)
+      end
+
+      it 'returns correct image with offset' do
+        create(:bucket_schedule, bucket: bucket, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION)
+        expect(bucket.get_next_rotation_image(1)).to eq(bucket_image2)
+      end
+
+      it 'wraps around when offset exceeds image count' do
+        create(:bucket_schedule, bucket: bucket, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION)
+        expect(bucket.get_next_rotation_image(3)).to eq(bucket_image1)
+      end
+
+      context 'with send history' do
+        let!(:rotation_schedule) { create(:bucket_schedule, bucket: bucket, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION) }
+
+        before do
+          # Create send history for first image
+          create(:bucket_send_history, 
+            bucket_schedule: rotation_schedule,
+            bucket_image: bucket_image1,
+            friendly_name: 'A',
+            sent_at: 1.hour.ago
+          )
+        end
+
+        it 'returns next image in rotation after last sent' do
+          result = bucket.get_next_rotation_image
+          expect(result).to eq(bucket_image2)
+        end
+
+        it 'wraps around to first image after last image' do
+          # Create history for last image
+          create(:bucket_send_history,
+            bucket_schedule: rotation_schedule,
+            bucket_image: bucket_image3,
+            friendly_name: 'C',
+            sent_at: 30.minutes.ago
+          )
+
+          result = bucket.get_next_rotation_image
+          expect(result).to eq(bucket_image1)
+        end
+
+        it 'applies offset correctly' do
+          result = bucket.get_next_rotation_image(1)
+          expect(result).to eq(bucket_image3)
+        end
+
+        it 'handles skip_offset parameter' do
+          result = bucket.get_next_rotation_image(0, 1)
+          expect(result).to eq(bucket_image3)
+        end
+      end
+
+      context 'with no images' do
+        before do
+          bucket.bucket_images.destroy_all
+        end
+
+        it 'returns nil when no images exist' do
+          create(:bucket_schedule, bucket: bucket, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION)
+          result = bucket.get_next_rotation_image
+          expect(result).to be_nil
+        end
       end
     end
   end

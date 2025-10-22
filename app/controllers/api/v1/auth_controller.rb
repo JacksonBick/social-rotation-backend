@@ -9,10 +9,26 @@ class Api::V1::AuthController < ApplicationController
 
   # POST /api/v1/auth/register
   # Create new user account
-  # Params: name, email, password, password_confirmation
+  # Params: name, email, password, password_confirmation, account_type, company_name
   # Returns: user object and JWT token
   def register
-    user = User.new(user_params)
+    # Handle agency/reseller account creation
+    if params[:account_type] == 'agency'
+      account = Account.create!(
+        name: params[:company_name] || "#{params[:name]}'s Agency",
+        is_reseller: true,
+        status: true
+      )
+      
+      user = User.new(user_params.merge(
+        account_id: account.id,
+        is_account_admin: true,
+        role: 'reseller'
+      ))
+    else
+      # Personal account (account_id defaults to 0)
+      user = User.new(user_params)
+    end
     
     if user.save
       token = JsonWebToken.encode(user_id: user.id)
@@ -63,6 +79,11 @@ class Api::V1::AuthController < ApplicationController
       id: user.id,
       name: user.name,
       email: user.email,
+      account_id: user.account_id,
+      is_account_admin: user.is_account_admin,
+      role: user.role,
+      super_admin: user.super_admin?,
+      reseller: user.reseller?,
       created_at: user.created_at
     }
   end

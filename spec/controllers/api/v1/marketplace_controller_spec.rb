@@ -50,6 +50,63 @@ RSpec.describe Api::V1::MarketplaceController, type: :controller do
       json_response = JSON.parse(response.body)
       expect(json_response['market_items'].length).to eq(2)
     end
+
+    context 'with super admin user' do
+      let(:super_admin) { create(:user, account_id: 0) }
+
+      before do
+        allow(controller).to receive(:current_user).and_return(super_admin)
+        create(:market_item, bucket: create(:bucket, user: super_admin), visible: true)
+      end
+
+      it 'shows all available items for super admin' do
+        get :available
+
+        expect(response).to have_http_status(:ok)
+        json_response = JSON.parse(response.body)
+        expect(json_response['market_items'].length).to eq(3)
+      end
+    end
+
+    context 'with reseller account user' do
+      let(:reseller_account) { create(:account, is_reseller: true) }
+      let(:reseller_user) { create(:user, account: reseller_account, is_account_admin: true) }
+      let(:reseller_bucket) { create(:bucket, user: reseller_user) }
+      let(:regular_user) { create(:user, account: reseller_account, is_account_admin: false) }
+
+      before do
+        allow(controller).to receive(:current_user).and_return(regular_user)
+        create(:market_item, bucket: reseller_bucket, visible: true)
+        create(:market_item, bucket: create(:bucket, user: create(:user)), visible: true) # Different reseller
+      end
+
+      it 'shows items from same reseller account' do
+        get :available
+
+        expect(response).to have_http_status(:ok)
+        json_response = JSON.parse(response.body)
+        expect(json_response['market_items'].length).to eq(1)
+        expect(json_response['market_items'].first['bucket']['user_id']).to eq(reseller_user.id)
+      end
+    end
+
+    context 'with user without marketplace access' do
+      let(:restricted_account) { create(:account) }
+      let(:restricted_user) { create(:user, account: restricted_account) }
+
+      before do
+        allow(controller).to receive(:current_user).and_return(restricted_user)
+        restricted_account.account_feature.update!(allow_marketplace: false)
+      end
+
+      it 'returns empty array when marketplace access is disabled' do
+        get :available
+
+        expect(response).to have_http_status(:ok)
+        json_response = JSON.parse(response.body)
+        expect(json_response['market_items']).to be_empty
+      end
+    end
   end
 
   describe 'GET #show' do

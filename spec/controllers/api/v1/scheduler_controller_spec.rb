@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe Api::V1::SchedulerController, type: :controller do
   let(:user) { create(:user) }
   let(:bucket) { create(:bucket, user: user) }
-  let(:bucket_schedule) { create(:bucket_schedule, bucket: bucket) }
+  let(:bucket_schedule) { create(:bucket_schedule, bucket: bucket, bucket_image: nil, schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION) }
 
   before do
     # Mock authentication
@@ -165,14 +165,33 @@ RSpec.describe Api::V1::SchedulerController, type: :controller do
   end
 
   describe 'POST #post_now' do
-    it 'increments times_sent counter' do
-      expect {
-        post :post_now, params: { id: bucket_schedule.id }
-      }.to change { bucket_schedule.reload.times_sent }.by(1)
+    let!(:bucket_image) { create(:bucket_image, bucket: bucket) }
+    let(:poster_double) { instance_double(SocialMediaPosterService) }
+    
+    before do
+      # Stub the SocialMediaPosterService
+      allow(SocialMediaPosterService).to receive(:new).and_return(poster_double)
+      allow(poster_double).to receive(:post_to_all).and_return({
+        'facebook' => { success: true },
+        'twitter' => { success: true }
+      })
+    end
 
+    it 'increments times_sent counter' do
+      post :post_now, params: { id: bucket_schedule.id }
+      
       expect(response).to have_http_status(:ok)
       json_response = JSON.parse(response.body)
       expect(json_response['message']).to eq('Post sent successfully')
+      expect(bucket_schedule.reload.times_sent).to eq(1)
+    end
+
+    it 'returns error when no images available' do
+      bucket_image.destroy
+      post :post_now, params: { id: bucket_schedule.id }
+      expect(response).to have_http_status(:unprocessable_content)
+      json_response = JSON.parse(response.body)
+      expect(json_response['error']).to eq('No images available in bucket')
     end
   end
 

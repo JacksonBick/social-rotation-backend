@@ -10,7 +10,10 @@ FactoryBot.define do
     watermark_opacity { 30 }
     watermark_offset_x { 10 }
     watermark_offset_y { 10 }
-    account_id { 1 }
+    account_id { 0 }  # Super admin by default (no account)
+    is_account_admin { false }
+    status { 1 }
+    role { 'user' }
     fb_user_access_key { "fb_token_123" }
     instagram_business_id { "ig_business_123" }
     twitter_oauth_token { "twitter_token_123" }

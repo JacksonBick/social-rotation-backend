@@ -10,9 +10,37 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_10_20_160005) do
+ActiveRecord::Schema[7.1].define(version: 2025_10_22_182221) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "account_features", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.boolean "allow_marketplace", default: true
+    t.boolean "allow_rss", default: true
+    t.boolean "allow_integrations", default: true
+    t.boolean "allow_watermark", default: true
+    t.integer "max_users", default: 1
+    t.integer "max_buckets", default: 10
+    t.integer "max_images_per_bucket", default: 100
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_account_features_on_account_id"
+  end
+
+  create_table "accounts", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "subdomain"
+    t.string "top_level_domain"
+    t.boolean "is_reseller", default: false
+    t.boolean "status", default: true
+    t.string "support_email"
+    t.text "terms_conditions"
+    t.text "privacy_policy"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["subdomain"], name: "index_accounts_on_subdomain", unique: true
+  end
 
   create_table "bucket_images", force: :cascade do |t|
     t.bigint "bucket_id", null: false
@@ -93,6 +121,39 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_20_160005) do
     t.index ["front_image_id"], name: "index_market_items_on_front_image_id"
   end
 
+  create_table "rss_feeds", force: :cascade do |t|
+    t.string "url", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.integer "account_id", null: false
+    t.integer "user_id", null: false
+    t.boolean "is_active", default: true
+    t.datetime "last_fetched_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_rss_feeds_on_account_id"
+    t.index ["is_active"], name: "index_rss_feeds_on_is_active"
+    t.index ["url"], name: "index_rss_feeds_on_url"
+    t.index ["user_id"], name: "index_rss_feeds_on_user_id"
+  end
+
+  create_table "rss_posts", force: :cascade do |t|
+    t.integer "rss_feed_id", null: false
+    t.string "title", null: false
+    t.text "description"
+    t.text "content"
+    t.string "image_url"
+    t.string "original_url"
+    t.datetime "published_at", null: false
+    t.boolean "is_processed", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["is_processed"], name: "index_rss_posts_on_is_processed"
+    t.index ["published_at"], name: "index_rss_posts_on_published_at"
+    t.index ["rss_feed_id", "published_at"], name: "index_rss_posts_on_rss_feed_id_and_published_at"
+    t.index ["rss_feed_id"], name: "index_rss_posts_on_rss_feed_id"
+  end
+
   create_table "user_market_items", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "market_item_id", null: false
@@ -113,7 +174,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_20_160005) do
     t.integer "watermark_opacity"
     t.integer "watermark_offset_x"
     t.integer "watermark_offset_y"
-    t.integer "account_id"
+    t.integer "account_id", default: 0
     t.text "fb_user_access_key"
     t.string "instagram_business_id"
     t.text "twitter_oauth_token"
@@ -137,6 +198,9 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_20_160005) do
     t.string "youtube_access_token"
     t.string "youtube_refresh_token"
     t.string "youtube_channel_id"
+    t.boolean "is_account_admin", default: false
+    t.integer "status", default: 1
+    t.string "role", default: "user"
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
@@ -150,6 +214,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_20_160005) do
     t.index ["user_id"], name: "index_videos_on_user_id"
   end
 
+  add_foreign_key "account_features", "accounts"
   add_foreign_key "bucket_images", "buckets"
   add_foreign_key "bucket_images", "images"
   add_foreign_key "bucket_schedules", "bucket_images"

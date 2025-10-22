@@ -246,5 +246,191 @@ RSpec.describe Api::V1::UserInfoController, type: :controller do
       expect(user_data).to have_key('digital_ocean_watermark_path')
     end
   end
+
+  # Test: Social media disconnect methods
+  describe 'POST #disconnect_facebook' do
+    before do
+      user.update!(
+        fb_user_access_key: 'fb_token_123',
+        instagram_business_id: 'ig_business_123'
+      )
+    end
+
+    it 'disconnects Facebook and Instagram' do
+      post :disconnect_facebook
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('Facebook disconnected successfully')
+      
+      user.reload
+      expect(user.fb_user_access_key).to be_nil
+      expect(user.instagram_business_id).to be_nil
+    end
+  end
+
+  describe 'POST #disconnect_twitter' do
+    before do
+      user.update!(
+        twitter_oauth_token: 'twitter_token_123',
+        twitter_oauth_token_secret: 'twitter_secret_123',
+        twitter_user_id: 'twitter_user_123',
+        twitter_screen_name: 'testuser',
+        twitter_url_oauth_token: 'twitter_url_token_123',
+        twitter_url_oauth_token_secret: 'twitter_url_secret_123'
+      )
+    end
+
+    it 'disconnects Twitter' do
+      post :disconnect_twitter
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('Twitter disconnected successfully')
+      
+      user.reload
+      expect(user.twitter_oauth_token).to be_nil
+      expect(user.twitter_oauth_token_secret).to be_nil
+      expect(user.twitter_user_id).to be_nil
+      expect(user.twitter_screen_name).to be_nil
+      expect(user.twitter_url_oauth_token).to be_nil
+      expect(user.twitter_url_oauth_token_secret).to be_nil
+    end
+  end
+
+  describe 'POST #disconnect_linkedin' do
+    before do
+      user.update!(
+        linkedin_access_token: 'linkedin_token_123',
+        linkedin_access_token_time: 1.hour.ago,
+        linkedin_profile_id: 'linkedin_profile_123'
+      )
+    end
+
+    it 'disconnects LinkedIn' do
+      post :disconnect_linkedin
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('LinkedIn disconnected successfully')
+      
+      user.reload
+      expect(user.linkedin_access_token).to be_nil
+      expect(user.linkedin_access_token_time).to be_nil
+      expect(user.linkedin_profile_id).to be_nil
+    end
+  end
+
+  describe 'POST #disconnect_google' do
+    before do
+      user.update!(
+        google_refresh_token: 'google_refresh_123',
+        location_id: 'location_123'
+      )
+    end
+
+    it 'disconnects Google My Business' do
+      post :disconnect_google
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('Google My Business disconnected successfully')
+      
+      user.reload
+      expect(user.google_refresh_token).to be_nil
+      expect(user.location_id).to be_nil
+    end
+  end
+
+  describe 'POST #disconnect_tiktok' do
+    before do
+      user.update!(
+        tiktok_access_token: 'tiktok_token_123',
+        tiktok_refresh_token: 'tiktok_refresh_123',
+        tiktok_user_id: 'tiktok_user_123',
+        tiktok_username: 'tiktokuser'
+      )
+    end
+
+    it 'disconnects TikTok' do
+      post :disconnect_tiktok
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('TikTok disconnected successfully')
+      
+      user.reload
+      expect(user.tiktok_access_token).to be_nil
+      expect(user.tiktok_refresh_token).to be_nil
+      expect(user.tiktok_user_id).to be_nil
+      expect(user.tiktok_username).to be_nil
+    end
+  end
+
+  describe 'POST #disconnect_youtube' do
+    before do
+      user.update!(
+        youtube_access_token: 'youtube_token_123',
+        youtube_refresh_token: 'youtube_refresh_123',
+        youtube_channel_id: 'youtube_channel_123'
+      )
+    end
+
+    it 'disconnects YouTube' do
+      post :disconnect_youtube
+
+      expect(response).to have_http_status(:ok)
+      json_response = JSON.parse(response.body)
+      expect(json_response['message']).to eq('YouTube disconnected successfully')
+      
+      user.reload
+      expect(user.youtube_access_token).to be_nil
+      expect(user.youtube_refresh_token).to be_nil
+      expect(user.youtube_channel_id).to be_nil
+    end
+  end
+
+  # Test: Connected accounts status in user JSON
+  describe 'connected accounts status' do
+    it 'shows correct connection status for all platforms' do
+      user.update!(
+        fb_user_access_key: 'fb_token',
+        twitter_oauth_token: 'twitter_token',
+        linkedin_access_token: 'linkedin_token',
+        google_refresh_token: 'google_token',
+        instagram_business_id: 'ig_business',
+        tiktok_access_token: 'tiktok_token',
+        youtube_access_token: 'youtube_token'
+      )
+
+      get :show
+
+      json_response = JSON.parse(response.body)
+      user_data = json_response['user']
+      
+      expect(user_data['facebook_connected']).to be true
+      expect(user_data['twitter_connected']).to be true
+      expect(user_data['linkedin_connected']).to be true
+      expect(user_data['google_connected']).to be true
+      expect(user_data['instagram_connected']).to be true
+      expect(user_data['tiktok_connected']).to be true
+      expect(user_data['youtube_connected']).to be true
+    end
+
+    it 'shows disconnected status when tokens are nil' do
+      get :show
+
+      json_response = JSON.parse(response.body)
+      user_data = json_response['user']
+      
+      expect(user_data['facebook_connected']).to be false
+      expect(user_data['twitter_connected']).to be false
+      expect(user_data['linkedin_connected']).to be false
+      expect(user_data['google_connected']).to be false
+      expect(user_data['instagram_connected']).to be false
+      expect(user_data['tiktok_connected']).to be false
+      expect(user_data['youtube_connected']).to be false
+    end
+  end
 end
 

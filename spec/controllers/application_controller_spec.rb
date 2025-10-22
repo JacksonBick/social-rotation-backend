@@ -11,10 +11,10 @@ RSpec.describe ApplicationController, type: :controller do
   describe 'authentication' do
     context 'with valid token' do
       let(:user) { create(:user) }
+      let(:valid_token) { JsonWebToken.encode(user_id: user.id) }
 
       before do
-        allow(controller).to receive(:decode_token).and_return(user.id)
-        request.headers['Authorization'] = 'Bearer valid_token'
+        request.headers['Authorization'] = "Bearer #{valid_token}"
       end
 
       it 'allows access with valid token' do
@@ -35,15 +35,14 @@ RSpec.describe ApplicationController, type: :controller do
 
     context 'with invalid token' do
       before do
-        allow(controller).to receive(:decode_token).and_raise(StandardError.new('Invalid token'))
-        request.headers['Authorization'] = 'Bearer invalid_token'
+        request.headers['Authorization'] = 'Bearer invalid_token_string'
       end
 
       it 'denies access with invalid token' do
         get :index
         expect(response).to have_http_status(:unauthorized)
         json_response = JSON.parse(response.body)
-        expect(json_response['error']).to eq('Invalid authentication token')
+        expect(json_response['error']).to eq('Invalid or expired token')
       end
     end
   end

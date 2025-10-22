@@ -177,7 +177,8 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_id = ENV['LINKEDIN_CLIENT_ID'] || '86e3q5wfvamuqa'
+    client_id = ENV['LINKEDIN_CLIENT_ID']
+    raise 'LinkedIn Client ID not configured' unless client_id
     # Use production callback URL for LinkedIn OAuth
     redirect_uri = ENV['LINKEDIN_CALLBACK'] || 'https://my.socialrotation.app/linkedin/callback'
     
@@ -208,8 +209,10 @@ class Api::V1::OauthController < ApplicationController
     end
     
     # Exchange code for access token
-    client_id = ENV['LINKEDIN_CLIENT_ID'] || '86e3q5wfvamuqa'
-    client_secret = ENV['LINKEDIN_CLIENT_SECRET'] || 'BP8wbuFAJGCVIYDq'
+    client_id = ENV['LINKEDIN_CLIENT_ID']
+    raise 'LinkedIn Client ID not configured' unless client_id
+    client_secret = ENV['LINKEDIN_CLIENT_SECRET']
+    raise 'LinkedIn Client Secret not configured' unless client_secret
     redirect_uri = ENV['LINKEDIN_CALLBACK'] || 'https://my.socialrotation.app/linkedin/callback'
     
     token_url = "https://www.linkedin.com/oauth/v2/accessToken"
@@ -250,7 +253,8 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_id = ENV['GOOGLE_CLIENT_ID'] || '1050295806479-d29blhmka53vtmj3dgshp59arp8ic8al.apps.googleusercontent.com'
+    client_id = ENV['GOOGLE_CLIENT_ID']
+    raise 'Google Client ID not configured' unless client_id
     # Use production callback URL for Google OAuth
     redirect_uri = ENV['GOOGLE_CALLBACK'] || 'https://my.socialrotation.app/google/callback'
     
@@ -282,8 +286,10 @@ class Api::V1::OauthController < ApplicationController
     end
     
     # Exchange code for access token
-    client_id = ENV['GOOGLE_CLIENT_ID'] || '1050295806479-d29blhmka53vtmj3dgshp59arp8ic8al.apps.googleusercontent.com'
-    client_secret = ENV['GOOGLE_CLIENT_SECRET'] || 'wyZs7M4qFFvd1C1TVQGqvY27'
+    client_id = ENV['GOOGLE_CLIENT_ID']
+    raise 'Google Client ID not configured' unless client_id
+    client_secret = ENV['GOOGLE_CLIENT_SECRET']
+    raise 'Google Client Secret not configured' unless client_secret
     redirect_uri = ENV['GOOGLE_CALLBACK'] || 'https://my.socialrotation.app/google/callback'
     
     token_url = "https://oauth2.googleapis.com/token"
@@ -320,7 +326,8 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_key = ENV['TIKTOK_CLIENT_KEY'] || 'YOUR_TIKTOK_CLIENT_KEY'
+    client_key = ENV['TIKTOK_CLIENT_KEY']
+    raise 'TikTok Client Key not configured' unless client_key
     redirect_uri = ENV['TIKTOK_CALLBACK'] || 'https://my.socialrotation.app/tiktok/callback'
     
     oauth_url = "https://www.tiktok.com/v2/auth/authorize?" \
@@ -350,8 +357,10 @@ class Api::V1::OauthController < ApplicationController
     end
     
     # Exchange code for access token
-    client_key = ENV['TIKTOK_CLIENT_KEY'] || 'YOUR_TIKTOK_CLIENT_KEY'
-    client_secret = ENV['TIKTOK_CLIENT_SECRET'] || 'YOUR_TIKTOK_CLIENT_SECRET'
+    client_key = ENV['TIKTOK_CLIENT_KEY']
+    raise 'TikTok Client Key not configured' unless client_key
+    client_secret = ENV['TIKTOK_CLIENT_SECRET']
+    raise 'TikTok Client Secret not configured' unless client_secret
     redirect_uri = ENV['TIKTOK_CALLBACK'] || 'https://my.socialrotation.app/tiktok/callback'
     
     token_url = "https://open.tiktokapis.com/v2/oauth/token/"
@@ -395,7 +404,8 @@ class Api::V1::OauthController < ApplicationController
     session[:oauth_state] = state
     session[:user_id] = current_user.id
     
-    client_id = ENV['YOUTUBE_CLIENT_ID'] || 'YOUR_YOUTUBE_CLIENT_ID'
+    client_id = ENV['YOUTUBE_CLIENT_ID']
+    raise 'YouTube Client ID not configured' unless client_id
     redirect_uri = ENV['YOUTUBE_CALLBACK'] || 'https://my.socialrotation.app/youtube/callback'
     
     oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?" \
@@ -426,8 +436,10 @@ class Api::V1::OauthController < ApplicationController
     end
     
     # Exchange code for access token
-    client_id = ENV['YOUTUBE_CLIENT_ID'] || 'YOUR_YOUTUBE_CLIENT_ID'
-    client_secret = ENV['YOUTUBE_CLIENT_SECRET'] || 'YOUR_YOUTUBE_CLIENT_SECRET'
+    client_id = ENV['YOUTUBE_CLIENT_ID']
+    raise 'YouTube Client ID not configured' unless client_id
+    client_secret = ENV['YOUTUBE_CLIENT_SECRET']
+    raise 'YouTube Client Secret not configured' unless client_secret
     redirect_uri = ENV['YOUTUBE_CALLBACK'] || 'https://my.socialrotation.app/youtube/callback'
     
     token_url = "https://oauth2.googleapis.com/token"

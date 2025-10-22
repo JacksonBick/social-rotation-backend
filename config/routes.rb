@@ -8,6 +8,12 @@ Rails.application.routes.draw do
   # API Routes
   namespace :api do
     namespace :v1 do
+      get 'sub_accounts/index'
+      get 'sub_accounts/create'
+      get 'sub_accounts/show'
+      get 'sub_accounts/update'
+      get 'sub_accounts/destroy'
+      get 'sub_accounts/switch'
       # Authentication routes
       post 'auth/login', to: 'auth#login'
       post 'auth/register', to: 'auth#register'
@@ -83,6 +89,37 @@ Rails.application.routes.draw do
       post 'scheduler/skip_image_single/:id', to: 'scheduler#skip_image_single'
       get 'scheduler/open_graph', to: 'scheduler#open_graph'
 
+      # Sub-account management routes
+      resources :sub_accounts, only: [:index, :create, :show, :update, :destroy] do
+        collection do
+          post 'switch/:id', to: 'sub_accounts#switch'
+        end
+      end
+      
+      # Account management routes
+      get 'account/features', to: 'accounts#features'
+      patch 'account/features', to: 'accounts#update_features'
+
+      # RSS feed management routes
+      resources :rss_feeds, only: [:index, :create, :show, :update, :destroy] do
+        member do
+          post :fetch_posts
+          get :posts
+        end
+      end
+
+      # RSS posts management routes
+      resources :rss_posts, only: [:index, :show, :update] do
+        member do
+          post :mark_processed
+          post :schedule_post
+        end
+        collection do
+          get :unprocessed
+          get :recent
+        end
+      end
+      
       # Marketplace routes
       resources :marketplace, only: [:index, :show] do
         member do

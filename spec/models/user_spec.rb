@@ -7,6 +7,8 @@ RSpec.describe User, type: :model do
   # TEST: User associations are properly configured
   # Verify user has many buckets and videos, both destroy on user deletion
   describe 'associations' do
+    # Should belong to account (optional)
+    it { should belong_to(:account).optional }
     # Should have many buckets that are destroyed when user is deleted
     it { should have_many(:buckets).dependent(:destroy) }
     # Should have many videos that are destroyed when user is deleted
@@ -69,6 +71,226 @@ RSpec.describe User, type: :model do
       expect(user.get_digital_ocean_watermark_path).to eq('')
       # Should return empty string for local storage path
       expect(user.get_watermark_logo).to eq('')
+    end
+  end
+
+  # TEST: Reseller and account admin methods
+  # Verify role-based methods return correct values
+  describe 'account/reseller methods' do
+    # Test: super_admin? returns true when account_id is 0
+    describe '#super_admin?' do
+      it 'returns true when account_id is 0' do
+        user = create(:user, account_id: 0)
+        expect(user.super_admin?).to be true
+      end
+
+      it 'returns false when account_id is not 0' do
+        user = create(:user, account_id: 1)
+        expect(user.super_admin?).to be false
+      end
+    end
+
+    # Test: account_admin? returns value of is_account_admin
+    describe '#account_admin?' do
+      it 'returns true when is_account_admin is true' do
+        user = create(:user, is_account_admin: true)
+        expect(user.account_admin?).to be true
+      end
+
+      it 'returns false when is_account_admin is false' do
+        user = create(:user, is_account_admin: false)
+        expect(user.account_admin?).to be false
+      end
+    end
+
+    # Test: reseller? returns true only when user is admin of reseller account
+    describe '#reseller?' do
+      it 'returns true when user is admin of reseller account' do
+        account = create(:account, is_reseller: true)
+        user = create(:user, account: account, is_account_admin: true)
+        expect(user.reseller?).to be true
+      end
+
+      it 'returns false when user is not an admin' do
+        account = create(:account, is_reseller: true)
+        user = create(:user, account: account, is_account_admin: false)
+        expect(user.reseller?).to be false
+      end
+
+      it 'returns false when account is not a reseller' do
+        account = create(:account, is_reseller: false)
+        user = create(:user, account: account, is_account_admin: true)
+        expect(user.reseller?).to be false
+      end
+
+      it 'returns false when user has no account' do
+        user = create(:user, account: nil, is_account_admin: true)
+        expect(user.reseller?).to be false
+      end
+    end
+
+    # Test: can_access_marketplace? checks super_admin or account feature
+    describe '#can_access_marketplace?' do
+      it 'returns true for super admin' do
+        user = create(:user, account_id: 0)
+        expect(user.can_access_marketplace?).to be true
+      end
+
+      it 'returns true when account feature allows marketplace' do
+        account = create(:account)
+        account.account_feature.update!(allow_marketplace: true)
+        user = create(:user, account: account)
+        expect(user.can_access_marketplace?).to be true
+      end
+
+      it 'returns false when account feature disallows marketplace' do
+        account = create(:account)
+        account.account_feature.update!(allow_marketplace: false)
+        user = create(:user, account: account)
+        expect(user.can_access_marketplace?).to be false
+      end
+    end
+
+    # Test: can_create_marketplace_item? checks super_admin or reseller
+    describe '#can_create_marketplace_item?' do
+      it 'returns true for super admin' do
+        user = create(:user, account_id: 0)
+        expect(user.can_create_marketplace_item?).to be true
+      end
+
+      it 'returns true for reseller' do
+        account = create(:account, is_reseller: true)
+        user = create(:user, account: account, is_account_admin: true)
+        expect(user.can_create_marketplace_item?).to be true
+      end
+
+      it 'returns false for regular user' do
+        account = create(:account, is_reseller: false)
+        user = create(:user, account: account, is_account_admin: false)
+        expect(user.can_create_marketplace_item?).to be false
+      end
+    end
+
+    # Test: can_create_sub_account? checks reseller status
+    describe '#can_create_sub_account?' do
+      it 'returns true for reseller' do
+        account = create(:account, is_reseller: true)
+        user = create(:user, account: account, is_account_admin: true)
+        expect(user.can_create_sub_account?).to be true
+      end
+
+      it 'returns false for non-reseller' do
+        account = create(:account, is_reseller: false)
+        user = create(:user, account: account, is_account_admin: true)
+        expect(user.can_create_sub_account?).to be false
+      end
+    end
+
+    # Test: account_users returns users in same account
+    describe '#account_users' do
+      let(:account) { create(:account) }
+      let!(:user1) { create(:user, account: account) }
+      let!(:user2) { create(:user, account: account) }
+      let!(:other_user) { create(:user, account: create(:account)) }
+
+      it 'returns all users in the same account' do
+        expect(user1.account_users).to contain_exactly(user1, user2)
+        expect(user1.account_users).not_to include(other_user)
+      end
+
+      it 'returns empty relation when account_id is 0' do
+        user = create(:user, account_id: 0)
+        expect(user.account_users).to be_empty
+      end
+    end
+
+    # Test: active scope returns only active users
+    describe '.active scope' do
+      let!(:active_user) { create(:user, status: 1) }
+      let!(:inactive_user) { create(:user, status: 0) }
+
+      it 'returns only users with status 1' do
+        expect(User.active).to include(active_user)
+        expect(User.active).not_to include(inactive_user)
+      end
+    end
+
+    # Test: watermark path methods
+    describe 'watermark path methods' do
+      let(:user) { create(:user, watermark_logo: 'test_logo.png') }
+
+      describe '#get_watermark_preview' do
+        it 'returns standard preview path' do
+          expect(user.get_watermark_preview).to eq('/user/standard_preview')
+        end
+      end
+
+      describe '#get_relative_digital_ocean_watermark_path' do
+        it 'returns correct relative path' do
+          expected_path = "#{Rails.env}/#{user.id}/watermarks/test_logo.png"
+          expect(user.get_relative_digital_ocean_watermark_path).to eq(expected_path)
+        end
+      end
+
+      describe '#get_digital_ocean_watermark_path' do
+        it 'returns full CDN URL when watermark exists' do
+          expected_url = "https://se1.sfo2.digitaloceanspaces.com/#{Rails.env}/#{user.id}/watermarks/test_logo.png"
+          expect(user.get_digital_ocean_watermark_path).to eq(expected_url)
+        end
+
+        it 'returns empty string when no watermark' do
+          user.update!(watermark_logo: nil)
+          expect(user.get_digital_ocean_watermark_path).to eq('')
+        end
+      end
+
+      describe '#get_watermark_logo' do
+        it 'returns local storage path when watermark exists' do
+          expected_path = "/storage/#{Rails.env}/#{user.id}/watermarks/test_logo.png"
+          expect(user.get_watermark_logo).to eq(expected_path)
+        end
+
+        it 'returns empty string when no watermark' do
+          user.update!(watermark_logo: nil)
+          expect(user.get_watermark_logo).to eq('')
+        end
+      end
+
+      describe '#get_absolute_watermark_logo_directory' do
+        it 'returns absolute directory path when watermark exists' do
+          expected_path = Rails.root.join("public/storage/#{Rails.env}/#{user.id}").to_s
+          expect(user.get_absolute_watermark_logo_directory).to eq(expected_path)
+        end
+
+        it 'returns empty string when no watermark' do
+          user.update!(watermark_logo: nil)
+          expect(user.get_absolute_watermark_logo_directory).to eq('')
+        end
+      end
+
+      describe '#get_absolute_watermark_scaled_logo_directory' do
+        it 'returns scaled directory path when watermark exists' do
+          expected_path = Rails.root.join("public/storage/#{Rails.env}/#{user.id}/watermarks_scaled").to_s
+          expect(user.get_absolute_watermark_scaled_logo_directory).to eq(expected_path)
+        end
+
+        it 'returns empty string when no watermark' do
+          user.update!(watermark_logo: nil)
+          expect(user.get_absolute_watermark_scaled_logo_directory).to eq('')
+        end
+      end
+
+      describe '#get_absolute_watermark_logo_path' do
+        it 'returns absolute file path when watermark exists' do
+          expected_path = Rails.root.join("public/storage/#{Rails.env}/#{user.id}/watermarks/test_logo.png").to_s
+          expect(user.get_absolute_watermark_logo_path).to eq(expected_path)
+        end
+
+        it 'returns empty string when no watermark' do
+          user.update!(watermark_logo: nil)
+          expect(user.get_absolute_watermark_logo_path).to eq('')
+        end
+      end
     end
   end
 end

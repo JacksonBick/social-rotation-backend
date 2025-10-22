@@ -20,11 +20,26 @@ class Api::V1::MarketplaceController < ApplicationController
   # GET /api/v1/marketplace/available
   def available
     # Get all available market items (not purchased by user)
+    # Filtered by account visibility rules
     purchased_ids = current_user.user_market_items.pluck(:market_item_id)
     
-    @market_items = MarketItem.where(visible: true)
-                              .where.not(id: purchased_ids)
-                              .includes(:bucket, :front_image)
+    # Build query based on user type
+    query = MarketItem.where(visible: true).where.not(id: purchased_ids)
+    
+    # Filter by account permissions
+    if current_user.super_admin?
+      # Super admins see everything
+      @market_items = query.includes(:bucket, :front_image)
+    elsif current_user.account && current_user.account.account_feature&.allow_marketplace
+      # Users with marketplace permission see:
+      # 1. Public items (created by super admins)
+      # 2. Items created by their reseller
+      bucket_ids = Bucket.where(user_id: get_visible_user_ids).pluck(:id)
+      @market_items = query.where(bucket_id: bucket_ids).includes(:bucket, :front_image)
+    else
+      # No marketplace access
+      @market_items = []
+    end
 
     render json: {
       market_items: @market_items.map { |item| market_item_json(item) }
@@ -258,6 +273,23 @@ class Api::V1::MarketplaceController < ApplicationController
       created_at: bucket_image.created_at,
       updated_at: bucket_image.updated_at
     }
+  end
+  
+  # Get list of user IDs whose marketplace items are visible to current user
+  def get_visible_user_ids
+    user_ids = []
+    
+    # Super admins created items (account_id = 0)
+    user_ids += User.where(account_id: 0).pluck(:id)
+    
+    # If user belongs to a reseller account, also show reseller's items
+    if current_user.account_id && current_user.account_id > 0
+      # Get the account admin (reseller) for this account
+      reseller_users = User.where(account_id: current_user.account_id, is_account_admin: true)
+      user_ids += reseller_users.pluck(:id)
+    end
+    
+    user_ids.uniq
   end
 end
 

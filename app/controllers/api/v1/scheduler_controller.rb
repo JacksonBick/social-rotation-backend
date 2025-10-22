@@ -70,9 +70,10 @@ class Api::V1::SchedulerController < ApplicationController
       history = @bucket_schedule.bucket_send_histories.create!(
         bucket_id: @bucket_schedule.bucket_id,
         bucket_image_id: bucket_image.id,
-        description: description,
+        friendly_name: bucket_image.friendly_name,
+        text: description,
         twitter_text: twitter_description,
-        post_to: @bucket_schedule.post_to,
+        sent_to: @bucket_schedule.post_to,
         sent_at: Time.current
       )
       

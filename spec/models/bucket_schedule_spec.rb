@@ -135,5 +135,113 @@ RSpec.describe BucketSchedule, type: :model do
         expect(annual_schedule.get_next_bucket_image_due).to eq(bucket_image)
       end
     end
+
+    describe '#get_time_format' do
+      it 'returns time from cron schedule' do
+        bucket_schedule.update!(schedule: '30 14 * * *')
+        expect(bucket_schedule.get_time_format).to eq('14:30')
+      end
+
+      it 'returns default time for wildcard schedule' do
+        bucket_schedule.update!(schedule: '* * * * *')
+        expect(bucket_schedule.get_time_format).to eq(BucketSchedule::DEFAULT_TIME)
+      end
+
+      it 'returns default time for invalid schedule' do
+        bucket_schedule.update!(schedule: 'invalid')
+        expect(bucket_schedule.get_time_format).to eq(BucketSchedule::DEFAULT_TIME)
+      end
+    end
+
+    describe '#get_scheduled_date_format' do
+      it 'returns date from cron schedule' do
+        bucket_schedule.update!(schedule: '0 9 15 12 *')
+        expected_date = "#{Date.current.year}-12-15"
+        expect(bucket_schedule.get_scheduled_date_format).to eq(expected_date)
+      end
+
+      it 'returns current date for wildcard schedule' do
+        bucket_schedule.update!(schedule: '0 9 * * *')
+        expected_date = Date.current.strftime('%Y-%m-%d')
+        expect(bucket_schedule.get_scheduled_date_format).to eq(expected_date)
+      end
+
+      it 'returns current date for invalid schedule' do
+        bucket_schedule.update!(schedule: 'invalid')
+        expected_date = Date.current.strftime('%Y-%m-%d')
+        expect(bucket_schedule.get_scheduled_date_format).to eq(expected_date)
+      end
+    end
+
+    describe '#get_next_description_due' do
+      context 'with once or annually schedule' do
+        before do
+          bucket_schedule.update!(
+            schedule_type: BucketSchedule::SCHEDULE_TYPE_ONCE,
+            description: 'Schedule description',
+            twitter_description: 'Twitter description'
+          )
+        end
+
+        it 'returns schedule description for regular text' do
+          result = bucket_schedule.get_next_description_due
+          expect(result).to eq('Schedule description')
+        end
+
+        it 'returns schedule twitter description for twitter text' do
+          result = bucket_schedule.get_next_description_due(0, 0, true)
+          expect(result).to eq('Twitter description')
+        end
+
+        it 'falls back to bucket_image description when schedule description is empty' do
+          bucket_schedule.update!(description: '')
+          bucket_image.update!(description: 'Image description')
+          result = bucket_schedule.get_next_description_due
+          expect(result).to eq('Image description')
+        end
+      end
+
+      context 'with rotation schedule' do
+        before do
+          bucket_schedule.update!(schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION)
+        end
+
+        it 'returns bucket_image description for rotation' do
+          bucket_image.update!(description: 'Image description')
+          result = bucket_schedule.get_next_description_due
+          expect(result).to eq('Image description')
+        end
+
+        it 'returns empty string when no bucket_image' do
+          bucket_schedule.update!(bucket_image: nil)
+          result = bucket_schedule.get_next_description_due
+          expect(result).to eq('')
+        end
+      end
+    end
+
+    describe 'self.get_network_hash' do
+      it 'returns correct network hash' do
+        hash = BucketSchedule.get_network_hash
+        expect(hash[BucketSchedule::BIT_FACEBOOK]).to eq('facebook_on.png')
+        expect(hash[BucketSchedule::BIT_TWITTER]).to eq('twitter_on.png')
+        expect(hash[BucketSchedule::BIT_LINKEDIN]).to eq('linkedin_on.png')
+        expect(hash[BucketSchedule::BIT_INSTAGRAM]).to eq('instagram_on.png')
+        expect(hash[BucketSchedule::BIT_GMB]).to eq('gmb_on.png')
+      end
+    end
+
+    describe 'self.get_days_of_week_array' do
+      it 'returns correct days of week hash' do
+        hash = BucketSchedule.get_days_of_week_array
+        expect(hash[1]).to eq('Monday')
+        expect(hash[2]).to eq('Tuesday')
+        expect(hash[3]).to eq('Wednesday')
+        expect(hash[4]).to eq('Thursday')
+        expect(hash[5]).to eq('Friday')
+        expect(hash[6]).to eq('Saturday')
+        expect(hash[7]).to eq('Sunday')
+      end
+    end
   end
 end
