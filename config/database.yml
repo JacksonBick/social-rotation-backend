@@ -79,6 +79,4 @@ test:
 #
 production:
   <<: *default
-  database: rebrand_social_rotation_production
-  username: rebrand_social_rotation
-  password: <%= ENV["REBRAND_SOCIAL_ROTATION_DATABASE_PASSWORD"] %>
+  url: <%= ENV['DATABASE_URL'] %>
