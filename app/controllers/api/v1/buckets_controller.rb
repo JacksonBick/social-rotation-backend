@@ -1,6 +1,6 @@
 class Api::V1::BucketsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_bucket, only: [:show, :update, :destroy, :page, :randomize, :images, :single_image, :upload_image]
+  before_action :set_bucket, only: [:show, :update, :destroy, :page, :randomize, :images, :single_image, :upload_image, :add_image]
   before_action :set_bucket_for_image_actions, only: [:update_image, :delete_image]
   before_action :set_bucket_image, only: [:update_image, :delete_image]
 
@@ -160,6 +160,38 @@ class Api::V1::BucketsController < ApplicationController
       File.delete(file_path) if File.exist?(file_path)
       render json: {
         errors: image.errors.full_messages
+      }, status: :unprocessable_entity
+    end
+  end
+
+  # POST /api/v1/buckets/:id/images (add existing image by ID)
+  def add_image
+    image_id = params[:image_id]
+    friendly_name = params[:friendly_name]
+    
+    unless image_id.present?
+      return render json: { error: 'image_id is required' }, status: :bad_request
+    end
+    
+    image = Image.find_by(id: image_id)
+    unless image
+      return render json: { error: 'Image not found' }, status: :not_found
+    end
+    
+    # Create BucketImage record linking the image to this bucket
+    bucket_image = @bucket.bucket_images.build(
+      image_id: image.id,
+      friendly_name: friendly_name || image.friendly_name
+    )
+    
+    if bucket_image.save
+      render json: {
+        bucket_image: bucket_image_json(bucket_image),
+        message: 'Image added successfully'
+      }, status: :created
+    else
+      render json: {
+        errors: bucket_image.errors.full_messages
       }, status: :unprocessable_entity
     end
   end

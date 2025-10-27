@@ -120,7 +120,7 @@ class User < ApplicationRecord
   
   # Check if user can access RSS feeds
   def can_access_rss_feeds?
-    super_admin? || account&.account_feature&.allow_rss
+    super_admin? || (account && account.account_feature&.allow_rss) || account_id.nil?
   end
   
   # Get all users in the same account (for account admins)

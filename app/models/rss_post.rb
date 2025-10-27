@@ -11,8 +11,8 @@ class RssPost < ApplicationRecord
   validates :rss_feed_id, presence: true
   
   # SCOPES
-  scope :processed, -> { where(is_processed: true) }
-  scope :unprocessed, -> { where(is_processed: false) }
+  scope :viewed, -> { where(is_viewed: true) }
+  scope :unviewed, -> { where(is_viewed: false) }
   scope :recent, -> { order(published_at: :desc) }
   scope :with_images, -> { where.not(image_url: [nil, '']) }
   
@@ -41,9 +41,9 @@ class RssPost < ApplicationRecord
     '/img/no_image_available.gif'
   end
   
-  # Mark this post as processed (reviewed/edited/scheduled)
-  def mark_as_processed!
-    update!(is_processed: true)
+  # Mark this post as viewed (reviewed/edited/scheduled)
+  def mark_as_viewed!
+    update!(is_viewed: true)
   end
   
   # Get formatted published date

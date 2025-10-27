@@ -54,6 +54,7 @@ Rails.application.routes.draw do
         member do
           get 'page/:page_num', to: 'buckets#page'
           get 'images', to: 'buckets#images'
+          post 'images', to: 'buckets#add_image'
           post 'images/upload', to: 'buckets#upload_image'
           get 'images/:image_id', to: 'buckets#single_image'
           patch 'images/:image_id', to: 'buckets#update_image'
@@ -100,8 +101,15 @@ Rails.application.routes.draw do
       get 'account/features', to: 'accounts#features'
       patch 'account/features', to: 'accounts#update_features'
 
+      # Image management routes
+      resources :images, only: [:create]
+
       # RSS feed management routes
       resources :rss_feeds, only: [:index, :create, :show, :update, :destroy] do
+        collection do
+          post :validate
+          post :fetch_all
+        end
         member do
           post :fetch_posts
           get :posts
@@ -111,12 +119,15 @@ Rails.application.routes.draw do
       # RSS posts management routes
       resources :rss_posts, only: [:index, :show, :update] do
         member do
-          post :mark_processed
+          post :mark_viewed
+          post :mark_unviewed
           post :schedule_post
         end
         collection do
-          get :unprocessed
+          get :unviewed
           get :recent
+          post :bulk_mark_viewed
+          post :bulk_mark_unviewed
         end
       end
       

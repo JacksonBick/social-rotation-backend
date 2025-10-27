@@ -7,3 +7,7 @@ RSpec.describe UserMarketItem, type: :model do
   end
 end
 
+
+
+
+

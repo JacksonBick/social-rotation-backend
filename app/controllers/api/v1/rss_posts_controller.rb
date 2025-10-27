@@ -4,15 +4,18 @@
 class Api::V1::RssPostsController < ApplicationController
   before_action :authenticate_user!
   before_action :require_rss_access!
-  before_action :set_rss_post, only: [:show, :update, :mark_processed, :schedule_post]
+  before_action :set_rss_post, only: [:show, :update, :mark_viewed, :mark_unviewed, :schedule_post]
 
   # GET /api/v1/rss_posts
   def index
     # Get all RSS posts for the user's account
     if current_user.super_admin?
       @posts = RssPost.includes(:rss_feed).recent
-    else
+    elsif current_user.account_id
       feed_ids = current_user.account.rss_feeds.pluck(:id)
+      @posts = RssPost.where(rss_feed_id: feed_ids).includes(:rss_feed).recent
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
       @posts = RssPost.where(rss_feed_id: feed_ids).includes(:rss_feed).recent
     end
 
@@ -62,35 +65,153 @@ class Api::V1::RssPostsController < ApplicationController
     end
   end
 
-  # POST /api/v1/rss_posts/:id/mark_processed
-  def mark_processed
-    @rss_post.mark_as_processed!
+  # POST /api/v1/rss_posts/:id/mark_viewed
+  def mark_viewed
+    @rss_post.mark_as_viewed!
     
     render json: {
       post: rss_post_json(@rss_post),
-      message: 'RSS post marked as processed'
+      message: 'RSS post marked as viewed'
+    }
+  end
+
+  # POST /api/v1/rss_posts/:id/mark_unviewed
+  def mark_unviewed
+    @rss_post.update!(is_viewed: false)
+    
+    render json: {
+      post: rss_post_json(@rss_post),
+      message: 'RSS post marked as unviewed'
+    }
+  end
+
+  # POST /api/v1/rss_posts/bulk_mark_viewed
+  def bulk_mark_viewed
+    post_ids = params[:post_ids] || []
+    
+    if post_ids.empty?
+      return render json: { error: 'No post IDs provided' }, status: :bad_request
+    end
+    
+    # Get posts the user has access to
+    if current_user.super_admin?
+      posts = RssPost.where(id: post_ids)
+    elsif current_user.account_id
+      feed_ids = current_user.account.rss_feeds.pluck(:id)
+      posts = RssPost.where(id: post_ids, rss_feed_id: feed_ids)
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
+      posts = RssPost.where(id: post_ids, rss_feed_id: feed_ids)
+    end
+    
+    count = posts.update_all(is_viewed: true)
+    
+    render json: {
+      message: "Marked #{count} posts as viewed",
+      count: count
+    }
+  end
+
+  # POST /api/v1/rss_posts/bulk_mark_unviewed
+  def bulk_mark_unviewed
+    post_ids = params[:post_ids] || []
+    
+    if post_ids.empty?
+      return render json: { error: 'No post IDs provided' }, status: :bad_request
+    end
+    
+    # Get posts the user has access to
+    if current_user.super_admin?
+      posts = RssPost.where(id: post_ids)
+    elsif current_user.account_id
+      feed_ids = current_user.account.rss_feeds.pluck(:id)
+      posts = RssPost.where(id: post_ids, rss_feed_id: feed_ids)
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
+      posts = RssPost.where(id: post_ids, rss_feed_id: feed_ids)
+    end
+    
+    count = posts.update_all(is_viewed: false)
+    
+    render json: {
+      message: "Marked #{count} posts as unviewed",
+      count: count
     }
   end
 
   # POST /api/v1/rss_posts/:id/schedule_post
   def schedule_post
-    # This would create a bucket and schedule for the RSS post
-    # For now, we'll just mark it as processed
-    @rss_post.mark_as_processed!
-    
-    render json: {
-      post: rss_post_json(@rss_post),
-      message: 'RSS post scheduled for social media posting'
-    }
+    begin
+      # Create a new bucket for this RSS post
+      bucket = current_user.buckets.create!(
+        name: @rss_post.short_title(50),
+        description: @rss_post.short_description(200),
+        account_id: current_user.account_id
+      )
+      
+      # Add the RSS post image to the bucket if it exists
+      if @rss_post.has_image?
+        # Create an Image record first
+        image = Image.create!(
+          file_path: @rss_post.image_url, # Store the URL as file_path for now
+          friendly_name: @rss_post.short_title(30)
+        )
+        
+        # Then create the BucketImage association
+        bucket_image = bucket.bucket_images.create!(
+          image: image,
+          friendly_name: @rss_post.short_title(30)
+        )
+      end
+      
+      # Create a default schedule for the bucket (post once per day)
+      # Set up a simple daily schedule at 12:00 PM
+      cron_string = "0 12 * * 1,2,3,4,5,6,7" # Every day at 12:00 PM
+      post_to = BucketSchedule::BIT_FACEBOOK | BucketSchedule::BIT_TWITTER # Post to Facebook and Twitter
+      
+      bucket_schedule = bucket.bucket_schedules.create!(
+        schedule: cron_string,
+        schedule_type: BucketSchedule::SCHEDULE_TYPE_ROTATION,
+        post_to: post_to,
+        description: @rss_post.short_description(200)
+      )
+      
+      # Mark the RSS post as viewed
+      @rss_post.mark_as_viewed!
+      
+      render json: {
+        post: rss_post_json(@rss_post),
+        bucket: {
+          id: bucket.id,
+          name: bucket.name,
+          description: bucket.description
+        },
+        bucket_schedule: {
+          id: bucket_schedule.id,
+          schedule_type: bucket_schedule.schedule_type,
+          schedule: bucket_schedule.schedule,
+          post_to: bucket_schedule.post_to
+        },
+        message: "RSS post scheduled successfully! Created bucket '#{bucket.name}' with daily posting at 12:00 PM to Facebook and Twitter."
+      }
+    rescue StandardError => e
+      Rails.logger.error "Error scheduling RSS post: #{e.message}"
+      render json: {
+        error: "Failed to schedule RSS post: #{e.message}"
+      }, status: :unprocessable_entity
+    end
   end
 
-  # GET /api/v1/rss_posts/unprocessed
-  def unprocessed
+  # GET /api/v1/rss_posts/unviewed
+  def unviewed
     if current_user.super_admin?
-      @posts = RssPost.unprocessed.includes(:rss_feed).recent
-    else
+      @posts = RssPost.unviewed.includes(:rss_feed).recent
+    elsif current_user.account_id
       feed_ids = current_user.account.rss_feeds.pluck(:id)
-      @posts = RssPost.where(rss_feed_id: feed_ids).unprocessed.includes(:rss_feed).recent
+      @posts = RssPost.where(rss_feed_id: feed_ids).unviewed.includes(:rss_feed).recent
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
+      @posts = RssPost.where(rss_feed_id: feed_ids).unviewed.includes(:rss_feed).recent
     end
 
     render json: {
@@ -102,8 +223,11 @@ class Api::V1::RssPostsController < ApplicationController
   def recent
     if current_user.super_admin?
       @posts = RssPost.recent.includes(:rss_feed).limit(10)
-    else
+    elsif current_user.account_id
       feed_ids = current_user.account.rss_feeds.pluck(:id)
+      @posts = RssPost.where(rss_feed_id: feed_ids).recent.includes(:rss_feed).limit(10)
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
       @posts = RssPost.where(rss_feed_id: feed_ids).recent.includes(:rss_feed).limit(10)
     end
 
@@ -117,8 +241,11 @@ class Api::V1::RssPostsController < ApplicationController
   def set_rss_post
     if current_user.super_admin?
       @rss_post = RssPost.find(params[:id])
-    else
+    elsif current_user.account_id
       feed_ids = current_user.account.rss_feeds.pluck(:id)
+      @rss_post = RssPost.where(rss_feed_id: feed_ids).find(params[:id])
+    else
+      feed_ids = current_user.rss_feeds.pluck(:id)
       @rss_post = RssPost.where(rss_feed_id: feed_ids).find(params[:id])
     end
   end
@@ -130,12 +257,12 @@ class Api::V1::RssPostsController < ApplicationController
   end
 
   def apply_filters
-    # Filter by processed status
-    case params[:processed]
+    # Filter by viewed status
+    case params[:viewed]
     when 'true'
-      @posts = @posts.processed
+      @posts = @posts.viewed
     when 'false'
-      @posts = @posts.unprocessed
+      @posts = @posts.unviewed
     end
 
     # Filter by RSS feed
@@ -177,7 +304,7 @@ class Api::V1::RssPostsController < ApplicationController
       image_url: post.image_url,
       original_url: post.original_url,
       published_at: post.published_at,
-      is_processed: post.is_processed,
+      is_viewed: post.is_viewed,
       short_title: post.short_title,
       short_description: post.short_description,
       has_image: post.has_image?,

@@ -3,14 +3,13 @@
 # Only main accounts (resellers) can create RSS feeds for their sub-accounts
 class RssFeed < ApplicationRecord
   # ASSOCIATIONS
-  belongs_to :account
+  belongs_to :account, optional: true
   belongs_to :user
   has_many :rss_posts, dependent: :destroy
   
   # VALIDATIONS
   validates :url, presence: true, format: { with: URI::regexp(%w[http https]) }
   validates :name, presence: true
-  validates :account_id, presence: true
   validates :user_id, presence: true
   
   # SCOPES
@@ -33,9 +32,9 @@ class RssFeed < ApplicationRecord
     rss_posts.order(published_at: :desc).limit(limit)
   end
   
-  # Get unprocessed posts
-  def unprocessed_posts
-    rss_posts.where(is_processed: false).order(published_at: :desc)
+  # Get unviewed posts
+  def unviewed_posts
+    rss_posts.where(is_viewed: false).order(published_at: :desc)
   end
   
   # Check if feed needs to be fetched (not fetched in last hour)
@@ -55,5 +54,36 @@ class RssFeed < ApplicationRecord
     return 'never_fetched' if last_fetched_at.nil?
     return 'needs_fetch' if needs_fetch?
     'active'
+  end
+  
+  # Health status methods
+  def healthy?
+    fetch_failure_count.to_i < 3
+  end
+  
+  def unhealthy?
+    !healthy?
+  end
+  
+  def record_success!
+    update!(
+      fetch_failure_count: 0,
+      last_fetch_error: nil,
+      last_successful_fetch_at: Time.current
+    )
+  end
+  
+  def record_failure!(error_message)
+    update!(
+      fetch_failure_count: fetch_failure_count.to_i + 1,
+      last_fetch_error: error_message
+    )
+  end
+  
+  def health_status
+    return 'broken' if fetch_failure_count.to_i >= 5
+    return 'degraded' if fetch_failure_count.to_i >= 3
+    return 'never_fetched' if last_fetched_at.nil?
+    'healthy'
   end
 end

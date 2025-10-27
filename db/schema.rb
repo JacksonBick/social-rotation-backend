@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_10_22_182221) do
+ActiveRecord::Schema[7.1].define(version: 2025_10_24_192819) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -125,12 +125,15 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_22_182221) do
     t.string "url", null: false
     t.string "name", null: false
     t.text "description"
-    t.integer "account_id", null: false
+    t.integer "account_id"
     t.integer "user_id", null: false
     t.boolean "is_active", default: true
     t.datetime "last_fetched_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "last_fetch_error"
+    t.integer "fetch_failure_count"
+    t.datetime "last_successful_fetch_at"
     t.index ["account_id"], name: "index_rss_feeds_on_account_id"
     t.index ["is_active"], name: "index_rss_feeds_on_is_active"
     t.index ["url"], name: "index_rss_feeds_on_url"
@@ -145,10 +148,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_10_22_182221) do
     t.string "image_url"
     t.string "original_url"
     t.datetime "published_at", null: false
-    t.boolean "is_processed", default: false
+    t.boolean "is_viewed", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["is_processed"], name: "index_rss_posts_on_is_processed"
+    t.index ["is_viewed"], name: "index_rss_posts_on_is_viewed"
     t.index ["published_at"], name: "index_rss_posts_on_published_at"
     t.index ["rss_feed_id", "published_at"], name: "index_rss_posts_on_rss_feed_id_and_published_at"
     t.index ["rss_feed_id"], name: "index_rss_posts_on_rss_feed_id"

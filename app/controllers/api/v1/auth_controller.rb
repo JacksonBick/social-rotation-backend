@@ -84,6 +84,11 @@ class Api::V1::AuthController < ApplicationController
       role: user.role,
       super_admin: user.super_admin?,
       reseller: user.reseller?,
+      can_access_marketplace: user.can_access_marketplace?,
+      can_create_marketplace_item: user.can_create_marketplace_item?,
+      can_create_sub_account: user.can_create_sub_account?,
+      can_manage_rss_feeds: user.can_manage_rss_feeds?,
+      can_access_rss_feeds: user.can_access_rss_feeds?,
       created_at: user.created_at
     }
   end
