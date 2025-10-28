@@ -65,3 +65,6 @@ gem "jwt", "~> 3.1"
 gem "rack-cors", "~> 3.0"
 
 gem "httparty", "~> 0.21"
+
+# AWS SDK for DigitalOcean Spaces (S3-compatible)
+gem "aws-sdk-s3", "~> 1.200", require: false

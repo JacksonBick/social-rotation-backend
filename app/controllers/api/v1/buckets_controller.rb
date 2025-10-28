@@ -108,11 +108,90 @@ class Api::V1::BucketsController < ApplicationController
 
     uploaded_file = params[:file]
     
-    # For now, we'll store files locally. Later we'll integrate Digital Ocean Spaces
     # Generate a unique filename to prevent collisions
     file_extension = File.extname(uploaded_file.original_filename)
     unique_filename = "#{SecureRandom.uuid}#{file_extension}"
     
+    # Extract friendly name from original filename (without extension)
+    friendly_name = File.basename(uploaded_file.original_filename, file_extension)
+    
+    begin
+      # Store file based on environment
+      if Rails.env.production? && ENV['DO_SPACES_KEY'].present?
+        # Production: Upload to DigitalOcean Spaces
+        relative_path = upload_to_spaces(uploaded_file, unique_filename)
+      else
+        # Development/Test: Store locally
+        relative_path = upload_locally(uploaded_file, unique_filename)
+      end
+      
+      # Create Image record
+      image = Image.new(
+        file_path: relative_path,
+        friendly_name: friendly_name
+      )
+      
+      if image.save
+        # Create BucketImage record linking the image to this bucket
+        bucket_image = @bucket.bucket_images.build(
+          image_id: image.id,
+          friendly_name: friendly_name
+        )
+        
+        if bucket_image.save
+          render json: {
+            bucket_image: bucket_image_json(bucket_image),
+            message: 'Image uploaded successfully'
+          }, status: :created
+        else
+          # If bucket_image fails to save, clean up the image
+          image.destroy
+          render json: {
+            errors: bucket_image.errors.full_messages
+          }, status: :unprocessable_entity
+        end
+      else
+        render json: {
+          errors: image.errors.full_messages
+        }, status: :unprocessable_entity
+      end
+    rescue => e
+      Rails.logger.error "Upload error: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      render json: { error: "Upload failed: #{e.message}" }, status: :internal_server_error
+    end
+  end
+  
+  # Upload file to DigitalOcean Spaces
+  def upload_to_spaces(uploaded_file, unique_filename)
+    require 'aws-sdk-s3'
+    
+    # Configure AWS SDK for DigitalOcean Spaces
+    s3_client = Aws::S3::Client.new(
+      access_key_id: ENV['DO_SPACES_KEY'],
+      secret_access_key: ENV['DO_SPACES_SECRET'],
+      endpoint: ENV['DO_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com',
+      region: ENV['DO_SPACES_REGION'] || 'sfo2',
+      force_path_style: false
+    )
+    
+    bucket_name = ENV['DO_SPACES_BUCKET']
+    key = "#{Rails.env}/#{unique_filename}"
+    
+    # Upload the file
+    s3_client.put_object(
+      bucket: bucket_name,
+      key: key,
+      body: uploaded_file.read,
+      acl: 'public-read'
+    )
+    
+    # Return the path for DigitalOcean Spaces URL
+    key
+  end
+  
+  # Upload file locally (development/test)
+  def upload_locally(uploaded_file, unique_filename)
     # Create directory if it doesn't exist
     upload_dir = Rails.root.join('public', 'uploads', Rails.env.to_s)
     FileUtils.mkdir_p(upload_dir) unless Dir.exist?(upload_dir)
@@ -123,45 +202,8 @@ class Api::V1::BucketsController < ApplicationController
       file.write(uploaded_file.read)
     end
     
-    # Store relative path for database
-    relative_path = "uploads/#{Rails.env}/#{unique_filename}"
-    
-    # Extract friendly name from original filename (without extension)
-    friendly_name = File.basename(uploaded_file.original_filename, file_extension)
-    
-    # Create Image record
-    image = Image.new(
-      file_path: relative_path,
-      friendly_name: friendly_name
-    )
-    
-    if image.save
-      # Create BucketImage record linking the image to this bucket
-      bucket_image = @bucket.bucket_images.build(
-        image_id: image.id,
-        friendly_name: friendly_name
-      )
-      
-      if bucket_image.save
-        render json: {
-          bucket_image: bucket_image_json(bucket_image),
-          message: 'Image uploaded successfully'
-        }, status: :created
-      else
-        # If bucket_image fails to save, clean up the image
-        image.destroy
-        File.delete(file_path) if File.exist?(file_path)
-        render json: {
-          errors: bucket_image.errors.full_messages
-        }, status: :unprocessable_entity
-      end
-    else
-      # If image fails to save, clean up the file
-      File.delete(file_path) if File.exist?(file_path)
-      render json: {
-        errors: image.errors.full_messages
-      }, status: :unprocessable_entity
-    end
+    # Return relative path for database
+    "uploads/#{Rails.env}/#{unique_filename}"
   end
 
   # POST /api/v1/buckets/:id/images (add existing image by ID)
