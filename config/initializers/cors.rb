@@ -8,7 +8,11 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
     # Allow requests from React frontend (development and production)
-    origins_list = ["http://localhost:3001", "http://127.0.0.1:3001"]
+    origins_list = [
+      "http://localhost:3001", 
+      "http://127.0.0.1:3001",
+      "https://social-rotation-frontend.onrender.com"  # Deployed frontend
+    ]
     origins_list << ENV['FRONTEND_URL'] if ENV['FRONTEND_URL'].present?
     
     origins origins_list

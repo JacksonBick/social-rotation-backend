@@ -81,7 +81,9 @@ Rails.application.configure do
   config.active_record.dump_schema_after_migration = false
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  config.hosts << ENV['FRONTEND_URL'] if ENV['FRONTEND_URL'].present?
+  # Allow requests from social-rotation-backend.onrender.com (your backend URL)
+  config.hosts << "social-rotation-backend.onrender.com"
+  config.hosts << "*.onrender.com" # Allow all Render subdomains
   config.hosts << "localhost" if ENV['RAILS_ENV'] == 'development'
   
   # Skip DNS rebinding protection for the default health check endpoint.
