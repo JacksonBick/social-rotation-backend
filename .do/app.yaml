@@ -1,0 +1,40 @@
+name: social-rotation-backend
+services:
+- name: api
+  source_dir: /
+  github:
+    repo: BOSS_GITHUB_USERNAME/Rebrand-Social-rotation
+    branch: main
+  build_command: bundle install && rails db:migrate
+  run_command: bundle exec rails server -p $PORT -e production
+  environment_slug: ruby
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  envs:
+  - key: RAILS_ENV
+    value: production
+  - key: RAILS_MASTER_KEY
+    value: YOUR_MASTER_KEY_HERE
+  - key: DATABASE_URL
+    value: ${db.DATABASE_URL}
+  - key: JWT_SECRET_KEY
+    value: YOUR_JWT_SECRET_HERE
+  - key: FRONTEND_URL
+    value: https://social-rotation-frontend.ondigitalocean.app
+  - key: DO_SPACES_KEY
+    value: YOUR_DO_SPACES_KEY
+  - key: DO_SPACES_SECRET
+    value: YOUR_DO_SPACES_SECRET
+  - key: DO_SPACES_REGION
+    value: sfo2
+  - key: DO_SPACES_BUCKET
+    value: YOUR_SPACE_NAME
+  - key: DO_SPACES_ENDPOINT
+    value: https://sfo2.digitaloceanspaces.com
+
+databases:
+- name: db
+  engine: PG
+  version: "13"

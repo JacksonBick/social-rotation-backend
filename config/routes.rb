@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   # API Routes
   namespace :api do
     namespace :v1 do
+      # Analytics (Instagram / Meta)
+      get 'analytics/instagram/summary', to: 'analytics#instagram_summary'
+      get 'analytics/instagram/timeseries', to: 'analytics#instagram_timeseries'
       get 'sub_accounts/index'
       get 'sub_accounts/create'
       get 'sub_accounts/show'
