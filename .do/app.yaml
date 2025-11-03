@@ -21,7 +21,7 @@ services:
   - key: RAILS_MASTER_KEY
     value: YOUR_MASTER_KEY_HERE
   - key: DATABASE_URL
-    value: ${db.DATABASE_URL}
+    value: ${dev-db-045706.DATABASE_URL}
   - key: JWT_SECRET_KEY
     value: YOUR_JWT_SECRET_HERE
   - key: FRONTEND_URL
@@ -36,8 +36,3 @@ services:
     value: YOUR_SPACE_NAME
   - key: DO_SPACES_ENDPOINT
     value: https://sfo2.digitaloceanspaces.com
-
-databases:
-- name: db
-  engine: PG
-  version: "13"
