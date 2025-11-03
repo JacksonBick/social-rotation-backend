@@ -8,11 +8,11 @@ local:
 
 digitalocean:
   service: S3
-  access_key_id: <%= ENV['DO_SPACES_KEY'] %>
-  secret_access_key: <%= ENV['DO_SPACES_SECRET'] %>
-  region: <%= ENV['DO_SPACES_REGION'] || 'sfo2' %>
-  bucket: <%= ENV['DO_SPACES_BUCKET'] %>
-  endpoint: <%= ENV['DO_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com' %>
+  access_key_id: <%= ENV['DO_SPACES_KEY'] || ENV['DIGITAL_OCEAN_SPACES_KEY'] %>
+  secret_access_key: <%= ENV['DO_SPACES_SECRET'] || ENV['DIGITAL_OCEAN_SPACES_SECRET'] %>
+  region: <%= ENV['DO_SPACES_REGION'] || ENV['DIGITAL_OCEAN_SPACES_REGION'] || 'sfo2' %>
+  bucket: <%= ENV['DO_SPACES_BUCKET'] || ENV['DIGITAL_OCEAN_SPACES_NAME'] %>
+  endpoint: <%= ENV['DO_SPACES_ENDPOINT'] || ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com' %>
 
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
