@@ -5,11 +5,14 @@ services:
   github:
     repo: BOSS_GITHUB_USERNAME/Rebrand-Social-rotation
     branch: main
-  build_command: bundle install && rails db:migrate
-  run_command: bundle exec rails server -b 0.0.0.0 -p $PORT -e production
+  build_command: bundle install
+  run_command: bundle exec rails db:migrate && bundle exec rails server -b 0.0.0.0 -p $PORT -e production
   environment_slug: ruby
   instance_count: 1
   instance_size_slug: basic-xxs
+  http_port: 8080
+  health_check:
+    http_path: /up
   routes:
   - path: /
   envs:
