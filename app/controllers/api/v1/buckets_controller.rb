@@ -117,9 +117,17 @@ class Api::V1::BucketsController < ApplicationController
     
     begin
       # Store file based on environment
-      if Rails.env.production? && ENV['DO_SPACES_KEY'].present?
-        # Production: Upload to DigitalOcean Spaces
-        relative_path = upload_to_spaces(uploaded_file, unique_filename)
+      if Rails.env.production?
+        # Support both naming conventions
+        spaces_key = ENV['DO_SPACES_KEY'] || ENV['DIGITAL_OCEAN_SPACES_KEY']
+        if spaces_key.present?
+          # Production: Upload to DigitalOcean Spaces
+          relative_path = upload_to_spaces(uploaded_file, unique_filename)
+        else
+          # Production without DigitalOcean: Use a placeholder URL
+          Rails.logger.warn "DigitalOcean Spaces not configured, using placeholder image"
+          relative_path = "placeholder/#{unique_filename}"
+        end
       else
         # Development/Test: Store locally
         relative_path = upload_locally(uploaded_file, unique_filename)
@@ -166,16 +174,21 @@ class Api::V1::BucketsController < ApplicationController
   def upload_to_spaces(uploaded_file, unique_filename)
     require 'aws-sdk-s3'
     
+    # Support both naming conventions
+    access_key = ENV['DO_SPACES_KEY'] || ENV['DIGITAL_OCEAN_SPACES_KEY']
+    secret_key = ENV['DO_SPACES_SECRET'] || ENV['DIGITAL_OCEAN_SPACES_SECRET']
+    endpoint = ENV['DO_SPACES_ENDPOINT'] || ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com'
+    region = ENV['DO_SPACES_REGION'] || ENV['DIGITAL_OCEAN_SPACES_REGION'] || 'sfo2'
+    bucket_name = ENV['DO_SPACES_BUCKET'] || ENV['DIGITAL_OCEAN_SPACES_NAME']
+    
     # Configure AWS SDK for DigitalOcean Spaces
     s3_client = Aws::S3::Client.new(
-      access_key_id: ENV['DO_SPACES_KEY'],
-      secret_access_key: ENV['DO_SPACES_SECRET'],
-      endpoint: ENV['DO_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com',
-      region: ENV['DO_SPACES_REGION'] || 'sfo2',
+      access_key_id: access_key,
+      secret_access_key: secret_key,
+      endpoint: endpoint,
+      region: region,
       force_path_style: false
     )
-    
-    bucket_name = ENV['DO_SPACES_BUCKET']
     key = "#{Rails.env}/#{unique_filename}"
     
     # Upload the file
