@@ -25,7 +25,7 @@ services:
   - key: JWT_SECRET_KEY
     value: YOUR_JWT_SECRET_HERE
   - key: FRONTEND_URL
-    value: https://social-rotation-frontend.ondigitalocean.app
+    value: https://social-rotation-frontend-f4mwb.ondigitalocean.app
   - key: DO_SPACES_KEY
     value: YOUR_DO_SPACES_KEY
   - key: DO_SPACES_SECRET
