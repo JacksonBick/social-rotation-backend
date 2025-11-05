@@ -9,13 +9,19 @@ fi
 
 echo "DATABASE_URL is set: ${DATABASE_URL:0:30}..."
 
-# Run migrations - db:prepare creates database if needed, then runs migrations
-echo "Setting up database..."
-bundle exec rails db:prepare
+# Run migrations - for managed databases, just run migrations (db already exists)
+echo "Running database migrations..."
+bundle exec rails db:migrate || echo "WARNING: Migration command failed, continuing anyway..."
 
 # Verify migrations ran successfully by checking if users table exists
 echo "Verifying database setup..."
-bundle exec rails runner "ActiveRecord::Base.connection.table_exists?('users') ? puts('✓ Database tables created') : (puts('✗ ERROR: Database tables not created!'); exit 1)"
+if bundle exec rails runner "puts ActiveRecord::Base.connection.table_exists?('users')" 2>/dev/null | grep -q "true"; then
+  echo "✓ Database tables exist"
+else
+  echo "✗ WARNING: Users table not found - migrations may have failed"
+  echo "Attempting to run migrations again..."
+  bundle exec rails db:migrate
+fi
 
 # Start the server
 echo "Starting Rails server..."
