@@ -81,15 +81,17 @@ Rails.application.configure do
   config.active_record.dump_schema_after_migration = false
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  # Allow requests from DigitalOcean App Platform
-  config.hosts << "*.ondigitalocean.app" # Allow all DigitalOcean App Platform subdomains
-  config.hosts << "*.onrender.com" # Allow all Render subdomains (legacy)
+  # Allow requests from DigitalOcean App Platform (use regex for wildcard matching)
+  config.hosts << /.*\.ondigitalocean\.app$/ # Allow all DigitalOcean App Platform subdomains
+  config.hosts << /.*\.onrender\.com$/ # Allow all Render subdomains (legacy)
   config.hosts << "localhost" if ENV['RAILS_ENV'] == 'development'
   
-  # Skip DNS rebinding protection for health check endpoints.
+  # Skip DNS rebinding protection for health check endpoints and all API routes.
   config.host_authorization = { 
     exclude: ->(request) { 
-      request.path == "/up" || request.path == "/" 
+      request.path == "/up" || 
+      request.path == "/" || 
+      request.path.start_with?("/api/")
     } 
   }
 end
