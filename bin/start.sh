@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Verify DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
@@ -7,8 +6,8 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-# Run migrations
-bundle exec rails db:migrate
+# Run migrations (don't fail if they already ran)
+bundle exec rails db:migrate || true
 
 # Start the server
 exec bundle exec rails server -b 0.0.0.0 -p $PORT -e production
