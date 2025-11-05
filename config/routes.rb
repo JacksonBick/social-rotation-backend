@@ -153,8 +153,5 @@ Rails.application.routes.draw do
   end
 
   # Defines the root path route ("/")
-  # root "posts#index"
-  
-  # Health check route (should already be at /up, but adding root as fallback)
-  root to: proc { [200, { 'Content-Type' => 'application/json' }, [{ message: 'Social Rotation API', version: '1.0', status: 'online' }.to_json]] }
+  root "health#show"
 end
