@@ -9,13 +9,15 @@ fi
 
 echo "DATABASE_URL is set: ${DATABASE_URL:0:30}..."
 
-# Run migrations (ignore errors if already migrated)
+# Run migrations - create database if it doesn't exist, then migrate
+echo "Setting up database..."
+bundle exec rails db:create 2>/dev/null || true
 echo "Running database migrations..."
-bundle exec rails db:migrate || echo "Migrations completed or already up to date"
+bundle exec rails db:migrate
 
-# Test database connection
-echo "Testing database connection..."
-bundle exec rails runner "ActiveRecord::Base.connection" || echo "WARNING: Database connection test failed"
+# Verify migrations ran successfully by checking if users table exists
+echo "Verifying database setup..."
+bundle exec rails runner "ActiveRecord::Base.connection.table_exists?('users') ? puts('✓ Database tables created') : (puts('✗ ERROR: Database tables not created!'); exit 1)"
 
 # Start the server
 echo "Starting Rails server..."
