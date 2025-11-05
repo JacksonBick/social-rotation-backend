@@ -2,7 +2,7 @@
 # Used for user authentication and session management
 class JsonWebToken
   # Secret key for signing tokens (should be in ENV in production)
-  SECRET_KEY = Rails.application.credentials.secret_key_base || 'your-secret-key'
+  SECRET_KEY = ENV['JWT_SECRET_KEY'] || Rails.application.credentials.secret_key_base || 'your-secret-key'
 
   # Encode user data into a JWT token
   # Params:
