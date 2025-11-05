@@ -9,11 +9,9 @@ fi
 
 echo "DATABASE_URL is set: ${DATABASE_URL:0:30}..."
 
-# Run migrations - create database if it doesn't exist, then migrate
+# Run migrations - db:prepare creates database if needed, then runs migrations
 echo "Setting up database..."
-bundle exec rails db:create 2>/dev/null || true
-echo "Running database migrations..."
-bundle exec rails db:migrate
+bundle exec rails db:prepare
 
 # Verify migrations ran successfully by checking if users table exists
 echo "Verifying database setup..."
