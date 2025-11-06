@@ -11,6 +11,10 @@ echo "DATABASE_URL: ${DATABASE_URL:0:50}..."
 echo "PORT: ${PORT:-8080}"
 echo "RAILS_ENV: ${RAILS_ENV:-production}"
 
+# Test database connection first
+echo "Testing database connection..."
+bundle exec rails runner "ActiveRecord::Base.connection.execute('SELECT 1')" 2>&1 || echo "Database connection test failed"
+
 # Run migrations - capture output to see what happens
 echo "Running database migrations..."
 MIGRATION_OUTPUT=$(bundle exec rails db:migrate 2>&1)
@@ -18,8 +22,12 @@ MIGRATION_EXIT=$?
 echo "$MIGRATION_OUTPUT"
 if [ $MIGRATION_EXIT -eq 0 ]; then
   echo "Migrations completed successfully"
+  # Verify users table exists
+  echo "Verifying users table exists..."
+  bundle exec rails runner "puts ActiveRecord::Base.connection.table_exists?('users') ? 'Users table exists' : 'Users table NOT found'" 2>&1
 else
   echo "Migration exit code: $MIGRATION_EXIT"
+  echo "Migration output: $MIGRATION_OUTPUT"
   echo "Attempting to continue anyway..."
 fi
 
