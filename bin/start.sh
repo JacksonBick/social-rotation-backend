@@ -11,12 +11,16 @@ echo "DATABASE_URL: ${DATABASE_URL:0:50}..."
 echo "PORT: ${PORT:-8080}"
 echo "RAILS_ENV: ${RAILS_ENV:-production}"
 
-# Run migrations (don't fail if they already ran)
+# Run migrations - capture output to see what happens
 echo "Running database migrations..."
-if bundle exec rails db:migrate 2>&1; then
+MIGRATION_OUTPUT=$(bundle exec rails db:migrate 2>&1)
+MIGRATION_EXIT=$?
+echo "$MIGRATION_OUTPUT"
+if [ $MIGRATION_EXIT -eq 0 ]; then
   echo "Migrations completed successfully"
 else
-  echo "Migration command had issues, but continuing..."
+  echo "Migration exit code: $MIGRATION_EXIT"
+  echo "Attempting to continue anyway..."
 fi
 
 # Start the server
