@@ -36,3 +36,23 @@ services:
     value: YOUR_SPACE_NAME
   - key: DO_SPACES_ENDPOINT
     value: https://sfo2.digitaloceanspaces.com
+
+jobs:
+- name: run-migrations
+  source_dir: /
+  github:
+    repo: BOSS_GITHUB_USERNAME/Rebrand-Social-rotation
+    branch: main
+  build_command: bundle install
+  run_command: bundle exec rails db:migrate
+  environment_slug: ruby
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  kind: RUN_ONCE
+  envs:
+  - key: RAILS_ENV
+    value: production
+  - key: RAILS_MASTER_KEY
+    value: YOUR_MASTER_KEY_HERE
+  - key: DATABASE_URL
+    value: ${dev-db-045706.DATABASE_URL}
