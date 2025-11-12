@@ -35,3 +35,6 @@
 # Ignore uploaded files
 /public/uploads/*
 !/public/uploads/.keep
+
+# Ignore test coverage
+/coverage/*

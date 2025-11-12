@@ -9,12 +9,24 @@ class Image < ApplicationRecord
   
   # Methods from original PHP
   def get_source_url
-    # Check if file_path is a DigitalOcean Spaces path (no "uploads/" prefix)
-    if file_path.start_with?('production/') || file_path.start_with?('development/') || file_path.start_with?('test/')
-      # DigitalOcean Spaces URL - support both naming conventions
-      endpoint = ENV['DO_SPACES_ENDPOINT'] || ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com'
-      bucket = ENV['DO_SPACES_BUCKET'] || ENV['DIGITAL_OCEAN_SPACES_NAME']
-      "#{endpoint}/#{bucket}/#{file_path}"
+    environments = %w[production development test]
+    if environments.any? { |env| file_path.start_with?("#{env}/") }
+      # Prefer explicit host overrides first
+      storage_host = ENV['ACTIVE_STORAGE_URL'].presence ||
+                     ENV['DO_SPACES_CDN_HOST'].presence ||
+                     ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'].presence ||
+                     ENV['DO_SPACES_ENDPOINT'].presence
+
+      if storage_host.present?
+        storage_host = storage_host.chomp('/')
+        "#{storage_host}/#{file_path}"
+      else
+        endpoint = ENV['DO_SPACES_ENDPOINT'] || ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'] || 'https://sfo2.digitaloceanspaces.com'
+        bucket = ENV['DO_SPACES_BUCKET'] || ENV['DIGITAL_OCEAN_SPACES_NAME']
+        endpoint = endpoint.chomp('/')
+        bucket_path = bucket.present? ? "/#{bucket}" : ""
+        "#{endpoint}#{bucket_path}/#{file_path}"
+      end
     elsif file_path.start_with?('placeholder/')
       # Placeholder image for production without DigitalOcean
       "https://via.placeholder.com/400x300/cccccc/666666?text=Image+Upload+Disabled"
