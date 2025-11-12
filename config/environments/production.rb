@@ -31,6 +31,17 @@ Rails.application.configure do
 
   # Store uploaded files on DigitalOcean Spaces (see config/storage.yml for options).
   config.active_storage.service = :digitalocean
+  storage_host = ENV['ACTIVE_STORAGE_URL'].presence ||
+                 ENV['DO_SPACES_CDN_HOST'].presence ||
+                 ENV['DIGITAL_OCEAN_SPACES_ENDPOINT'].presence ||
+                 "https://new-social-rotation-backend-qzyk8.ondigitalocean.app"
+
+  config.active_storage.default_url_options = { host: storage_host }
+
+  configure_asset_host = ENV['CONFIGURE_ASSET_HOST']
+  if configure_asset_host.blank? || configure_asset_host.casecmp('false') != 0
+    config.asset_host = storage_host
+  end
 
   # Mount Action Cable outside main process or domain.
   # config.action_cable.mount_path = nil
