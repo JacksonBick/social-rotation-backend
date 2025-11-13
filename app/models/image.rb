@@ -27,6 +27,8 @@ class Image < ApplicationRecord
         bucket_path = bucket.present? ? "/#{bucket}" : ""
         "#{endpoint}#{bucket_path}/#{file_path}"
       end
+    elsif file_path.start_with?('http://', 'https://')
+      file_path
     elsif file_path.start_with?('placeholder/')
       # Placeholder image for production without DigitalOcean
       "https://via.placeholder.com/400x300/cccccc/666666?text=Image+Upload+Disabled"
